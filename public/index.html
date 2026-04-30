@@ -450,12 +450,8 @@ const socket = new WebSocket(protocol + window.location.host);
                 const targetView = document.getElementById(targetId);
                 
                 // Для телефонов используем flex (одна колонка), для ПК - grid (две колонки)
-                if (window.innerWidth <= 768) {
-                    targetView.style.display = 'flex';
-                    targetView.style.flexDirection = 'column';
-                } else {
-                    targetView.style.display = 'grid';
-                }
+                // Просто убираем скрытие и возвращаем элементу его родной стиль из CSS
+                targetView.style.display = '';
             });
         });
     </script>
