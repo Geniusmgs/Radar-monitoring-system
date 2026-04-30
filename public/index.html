@@ -239,15 +239,13 @@
         }
     </style>
 </head>
-<body>
 
     <aside class="sidebar">
         <div class="brand">RadarView UX</div>
         <div style="margin-top: 10px;">
-            <div class="nav-item active">⚲ Live Monitoring</div>
-            <div class="nav-item">≡ Event Log</div>
-            <div class="nav-item">◱ Analytics</div>
-            <div class="nav-item">⚙ Settings</div>
+            <div class="nav-item active" data-target="view-dashboard">⚲ Live Monitoring</div>
+            <div class="nav-item" data-target="view-analytics">◱ Analytics</div>
+            <div class="nav-item" data-target="view-settings">⚙ Settings</div>
         </div>
         <div class="sys-health">
             <div class="health-row"><span>CPU</span><span>12%</span></div>
@@ -442,6 +440,12 @@ const socket = new WebSocket(protocol + window.location.host);
 
         navItems.forEach(item => {
             item.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const targetView = document.getElementById(targetId);
+
+                // Защита от зависания, если экрана не существует
+                if (!targetView) return;
+
                 // 1. Убираем подсветку со всех кнопок и скрываем все экраны
                 navItems.forEach(nav => nav.classList.remove('active'));
                 views.forEach(view => document.getElementById(view).style.display = 'none');
@@ -449,12 +453,7 @@ const socket = new WebSocket(protocol + window.location.host);
                 // 2. Делаем нажатую кнопку активной
                 this.classList.add('active');
 
-                // 3. Показываем нужный экран (в зависимости от data-target)
-                const targetId = this.getAttribute('data-target');
-                const targetView = document.getElementById(targetId);
-                
-                // Для телефонов используем flex (одна колонка), для ПК - grid (две колонки)
-                // Просто убираем скрытие и возвращаем элементу его родной стиль из CSS
+                // 3. Возвращаем элементу его родной стиль из CSS
                 targetView.style.display = '';
             });
         });
