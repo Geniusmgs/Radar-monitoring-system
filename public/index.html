@@ -238,6 +238,7 @@
             }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
     <aside class="sidebar">
@@ -323,14 +324,14 @@
                 <div id="log-list" class="log-list"></div>
             </div>
         </main>
-        <div id="view-analytics" class="dashboard" style="display: none;">
-        <div class="glass log-container" style="grid-column: 1 / -1; height: 500px;">
-            <div class="log-header"><i class="fas fa-chart-pie"></i> Zone Analytics</div>
-            <div style="padding: 40px; text-align: center; color: var(--text-muted);">
-                <i class="fas fa-hammer" style="font-size: 3rem; margin-bottom: 20px;"></i>
-                <h2>Модуль аналитики в разработке</h2>
-                <p>Здесь будут графики времени, проведенного в каждой комнате.</p>
+    <div id="view-analytics" class="dashboard view-hidden">
+        <div class="glass log-container" style="grid-column: 1 / -1; padding: 20px;">
+            <div class="log-header"><i class="fas fa-chart-pie"></i> Zone Activity Distribution (Demo)</div>
+            
+            <div style="position: relative; height: 400px; width: 100%; display: flex; justify-content: center; align-items: center; padding: 20px;">
+                <canvas id="analyticsChart"></canvas>
             </div>
+            
         </div>
     </div>
 
@@ -456,6 +457,49 @@ const socket = new WebSocket(protocol + window.location.host);
                 // 3. Возвращаем элементу его родной стиль из CSS
                 targetView.style.display = '';
             });
+        });
+        // --- ЛОГИКА АНАЛИТИКИ (Chart.js) ---
+        // Настраиваем глобальные цвета под темную тему
+        Chart.defaults.color = '#9fb0d0'; 
+        Chart.defaults.font.family = "'Inter', sans-serif";
+
+        const ctx = document.getElementById('analyticsChart').getContext('2d');
+        const analyticsChart = new Chart(ctx, {
+            type: 'doughnut', // Тип: график-кольцо
+            data: {
+                labels: ['Моя спальня', 'Зал', 'Кухня', 'Ванная', 'Коридор'],
+                datasets: [{
+                    label: 'Активность (%)',
+                    data: [45, 25, 15, 5, 10], // Демо-данные в процентах
+                    backgroundColor: [
+                        'rgba(59, 130, 246, 0.8)',  // Синий (как active)
+                        'rgba(139, 92, 246, 0.8)',  // Фиолетовый
+                        'rgba(16, 185, 129, 0.8)',  // Зеленый (как online)
+                        'rgba(245, 158, 11, 0.8)',  // Оранжевый (как warning)
+                        'rgba(239, 68, 68, 0.8)'    // Красный (как alert)
+                    ],
+                    borderColor: '#111a2e', // Цвет обводки совпадает с панелями
+                    borderWidth: 3,
+                    hoverOffset: 10 // Насколько сектор "выпрыгивает" при наведении
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: window.innerWidth <= 768 ? 'bottom' : 'right', // Для телефона легенда снизу, для ПК - справа
+                        labels: { padding: 20, font: { size: 13 } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return ' ' + context.label + ': ' + context.raw + '% времени';
+                            }
+                        }
+                    }
+                }
+            }
         });
     </script>
 </body>
