@@ -346,14 +346,14 @@
                         <div style="font-weight: 600; font-size: 15px;">System Armed</div>
                         <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Enable or disable LD2450 radar detection</div>
                     </div>
-                    <input type="checkbox" checked style="width: 20px; height: 20px; cursor: pointer;">
+                    <input id="ui-armed" type="checkbox" checked onchange="sendSettings()" style="width: 20px; height: 20px; cursor: pointer;">
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
                     <div style="flex-grow: 1; padding-right: 40px;">
                         <div style="font-weight: 600; font-size: 15px;">Radar Noise Filter (Distance)</div>
                         <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Ignore movements closer than <span id="ui-sens-val" style="color: var(--text-main); font-weight: bold;">30</span> cm</div>
-                        <input type="range" min="0" max="100" value="30" style="width: 100%; margin-top: 15px; cursor: pointer;" oninput="document.getElementById('ui-sens-val').innerText = this.value">
+                        <input id="ui-sens" type="range" min="0" max="100" value="30" onchange="sendSettings()" oninput="document.getElementById('ui-sens-val').innerText = this.value" style="width: 100%; margin-top: 15px; cursor: pointer;">
                     </div>
                 </div>
 
@@ -362,19 +362,45 @@
                         <div style="font-weight: 600; font-size: 15px;">Restart Hardware</div>
                         <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Remote reboot of the ESP32-C3 module</div>
                     </div>
-                    <button style="background: var(--alert); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s;">
-                        Reboot ESP32
+                    <button onclick="sendReboot()" style="background: var(--alert); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s;">
+                    Reboot ESP32
                     </button>
                 </div>
 
             </div>
         </div>
     </div>
-    
+
     <script>
         // Автоматическое переключение между ws:// (локально) и wss:// (в облаке)
 const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
 const socket = new WebSocket(protocol + window.location.host);
+// --- ФУНКЦИИ УПРАВЛЕНИЯ НАСТРОЙКАМИ ---
+        function sendSettings() {
+            const isArmed = document.getElementById('ui-armed').checked;
+            const sensValue = parseInt(document.getElementById('ui-sens').value);
+            
+            const payload = {
+                type: 'settings_update',
+                armed: isArmed,
+                sensitivity: sensValue
+            };
+            
+            // Отправляем JSON на сервер через WebSocket
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify(payload));
+                addLog(`Settings updated: Filter ${sensValue}cm`, 'info');
+            }
+        }
+
+        function sendReboot() {
+            if(confirm("Вы уверены, что хотите перезагрузить ESP32?")) {
+                if (socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({ type: 'settings_update', reboot: true }));
+                    addLog('Reboot command sent to hardware', 'alert');
+                }
+            }
+        }
         
         const zoneNames = {
             'my_bedroom': 'My Bedroom',

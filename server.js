@@ -3,7 +3,13 @@ const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 
-const app = express(); 
+const app = express();
+// Глобальное состояние настроек системы
+let deviceSettings = {
+    armed: true,         // Включен ли радар
+    sensitivity: 300,    // Фильтр дистанции в миллиметрах (по умолчанию 30 см)
+    reboot: false        // Флаг перезагрузки
+}; 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
@@ -79,15 +85,37 @@ app.post('/api/data', (req, res) => {
         }
     });
     
-    res.status(200).send({ status: 'ok' });
+// Отправляем плате текущие настройки вместо пустого "ОК"
+    res.json(deviceSettings);
+
+    // Если была команда на перезагрузку, сбрасываем флаг, чтобы плата не ушла в бесконечный ребут
+    if (deviceSettings.reboot) {
+        console.log("Reboot command sent to ESP32!");
+        deviceSettings.reboot = false; 
+    }
 });
 
 wss.on('connection', (ws) => {
-    console.log('Новий клієнт підключився до сайту');
-    ws.send(JSON.stringify({ 
-        type: 'status', 
-        status: isSensorOnline ? 'online' : 'offline' 
-    }));
+    console.log('New client connected');
+
+    // СЛУШАЕМ КОМАНДЫ ОТ САЙТА
+    ws.on('message', (message) => {
+        try {
+            const msg = JSON.parse(message);
+            if (msg.type === 'settings_update') {
+                // Обновляем настройки на сервере
+                if (msg.armed !== undefined) deviceSettings.armed = msg.armed;
+                if (msg.sensitivity !== undefined) deviceSettings.sensitivity = msg.sensitivity * 10; // Переводим см в мм для ESP32
+                if (msg.reboot !== undefined) deviceSettings.reboot = msg.reboot;
+                
+                console.log('New settings applied:', deviceSettings);
+            }
+        } catch (e) {
+            console.error("Error parsing settings:", e);
+        }
+    });
+
+    ws.on('close', () => console.log('Client disconnected'));
 });
 
 // Render сам передаст нужный порт в переменную PORT
