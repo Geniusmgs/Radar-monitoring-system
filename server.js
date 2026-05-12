@@ -4,124 +4,111 @@ const WebSocket = require('ws');
 const path = require('path');
 
 const app = express();
-// Глобальное состояние настроек системы
-let deviceSettings = {
-    armed: true,         // Включен ли радар
-    sensitivity: 300,    // Фильтр дистанции в миллиметрах (по умолчанию 30 см)
-    reboot: false        // Флаг перезагрузки
-}; 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Разрешаем серверу брать статические файлы отовсюду
-app.use(express.static(__dirname));
-app.use(express.static(path.join(__dirname, 'public')));
+// Глобальное состояние настроек системы
+let deviceSettings = {
+    armed: true,         // Включен ли радар
+    sensitivity: 300,    // Фильтр дистанции в миллиметрах
+    reboot: false        // Флаг перезагрузки
+}; 
 
-// Прямой приказ: что делать при заходе на главную страницу (/)
-app.get('/', (req, res) => {
-    // Сначала пробуем найти index.html в папке public
-    const publicPath = path.join(__dirname, 'public', 'index.html');
-    const rootPath = path.join(__dirname, 'index.html');
-
-    res.sendFile(publicPath, (err) => {
-        if (err) {
-            // Если в public не нашли, берем из корня
-            res.sendFile(rootPath); 
-        }
-    });
-});
-app.use(express.json());
-
-
-// Змінні для контролю статусу
+// Константы для контроля статуса
 let lastPingTime = 0;
 let isSensorOnline = false;
 const ESP_SECRET_TOKEN = "RadarView-ESP32-C3-SecretKey-2026";
 
-// Таймер (працює кожну секунду), який перевіряє зв'язок
+// Настройка статики: теперь сервер корректно найдет файлы и в корне, и в /public
+app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
+
+// Главная страница
+app.get('/', (req, res) => {
+    // Безопасный способ отправки файла без дублирования заголовков
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Таймер проверки связи (раз в секунду)
 setInterval(() => {
     const now = Date.now();
-    // Якщо даних не було більше 15 секунд, вважаємо, що датчик відключився
     if (isSensorOnline && (now - lastPingTime > 15000)) {
         isSensorOnline = false;
-        console.log('Помилка: Зв\'язок з ESP32 втрачено!');
+        console.log('❌ Связь с ESP32 потеряна!');
         
-        wss.clients.forEach(client => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify({ type: 'status', status: 'offline' }));
-            }
-        });
+        broadcast({ type: 'status', status: 'offline' });
     }
 }, 1000);
 
+// API для получения данных от ESP32
 app.post('/api/data', (req, res) => {
     const data = req.body;
     
-    // ПРОВЕРКА БЕЗОПАСНОСТИ
+    // 1. Проверка токена
     if (data.token !== ESP_SECRET_TOKEN) {
-        console.log('⚠️ Внимание! Попытка взлома или неверный токен устройства!');
-        return res.status(403).send({ error: 'Unauthorized. Wrong token.' });
+        console.log('⚠️ Попытка доступа с неверным токеном!');
+        return res.status(403).json({ error: 'Unauthorized' });
     }
     
-    // Оновлюємо час останнього сигналу
+    // 2. Обновление статуса онлайн
     lastPingTime = Date.now();
-    
     if (!isSensorOnline) {
         isSensorOnline = true;
-        console.log('Зв\'язок з ESP32 відновлено!');
-        wss.clients.forEach(client => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify({ type: 'status', status: 'online' }));
-            }
-        });
+        console.log('✅ ESP32 снова в сети!');
+        broadcast({ type: 'status', status: 'online' });
     }
 
-    console.log('Дані від ESP32:', data);
+    // 3. Логирование координат (нужно для калибровки твоих 10 зон)
+    // Теперь ты будешь видеть в логах Render, куда именно ты наступил
+    console.log(`📍 Координаты: X=${data.x}, Y=${data.y} | Зона: ${data.zone}`);
     
-    // Розсилаємо самі дані про рух
-    wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(data));
-        }
-    });
+    // 4. Рассылка данных всем подключенным браузерам
+    broadcast(data);
     
-// Отправляем плате текущие настройки вместо пустого "ОК"
+    // 5. Ответ плате с актуальными настройками
     res.json(deviceSettings);
 
-    // Если была команда на перезагрузку, сбрасываем флаг, чтобы плата не ушла в бесконечный ребут
+    // Сброс флага перезагрузки после отправки подтверждения
     if (deviceSettings.reboot) {
-        console.log("Reboot command sent to ESP32!");
+        console.log("🚀 Команда на перезагрузку успешно передана устройству.");
         deviceSettings.reboot = false; 
     }
 });
 
+// WebSocket логика
 wss.on('connection', (ws) => {
-    console.log('New client connected');
+    console.log('🌐 Новый клиент подключился к панели управления');
 
-    // СЛУШАЕМ КОМАНДЫ ОТ САЙТА
     ws.on('message', (message) => {
         try {
             const msg = JSON.parse(message);
             if (msg.type === 'settings_update') {
-                // Обновляем настройки на сервере
                 if (msg.armed !== undefined) deviceSettings.armed = msg.armed;
-                if (msg.sensitivity !== undefined) deviceSettings.sensitivity = msg.sensitivity * 10; // Переводим см в мм для ESP32
+                // Конвертируем СМ в ММ для датчика
+                if (msg.sensitivity !== undefined) deviceSettings.sensitivity = msg.sensitivity * 10;
                 if (msg.reboot !== undefined) deviceSettings.reboot = msg.reboot;
                 
-                console.log('New settings applied:', deviceSettings);
+                console.log('⚙️ Настройки обновлены:', deviceSettings);
             }
         } catch (e) {
-            console.error("Error parsing settings:", e);
+            console.error("Ошибка парсинга настроек:", e);
         }
     });
 
-    ws.on('close', () => console.log('Client disconnected'));
+    ws.on('close', () => console.log('🔌 Клиент отключился'));
 });
 
-// Render сам передаст нужный порт в переменную PORT
-const PORT = process.env.PORT || 3000;
+// Функция для массовой рассылки сообщений через WebSocket
+function broadcast(payload) {
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify(payload));
+        }
+    });
+}
 
-// Важно: на Render нужно слушать адрес '0.0.0.0'
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Сервер запущено на порту ${PORT}`);
+    console.log(`🚀 Сервер Pidkamennyi O.M. запущен на порту ${PORT}`);
 });
