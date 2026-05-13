@@ -320,17 +320,91 @@
         </div>
     </div>
 
-    <script>
+<script>
         const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-        const socket = new WebSocket(protocol + window.location.host);
+        let socket; // 1. Объявляем сокет здесь, чтобы его видели ВСЕ функции
 
+        // 2. Создаем функцию-оболочку для подключения
+        function connectWebSocket() {
+            socket = new WebSocket(protocol + window.location.host);
+
+            // ОСНОВНАЯ ЛОГИКА ДАННЫХ (теперь она привязана к текущему подключению)
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                const sensorModule = document.getElementById('sensor_module');
+                const radarPulse = document.getElementById('radar-pulse');
+
+                // 1. СТАТУС
+                if (data.type === 'status') {
+                    const statusVal = document.getElementById('ui-sensor-status');
+                    if (data.status === 'online') {
+                        statusVal.innerText = 'ONLINE'; statusVal.style.color = 'var(--online)';
+                        if(sensorModule) { sensorModule.style.opacity = '1'; sensorModule.style.filter = 'none'; }
+                        if(radarPulse) radarPulse.style.display = 'block';
+                        addLog('Sensor established', 'info');
+                    } else {
+                        statusVal.innerText = 'OFFLINE'; statusVal.style.color = 'var(--alert)';
+                        if(sensorModule) { sensorModule.style.opacity = '0.3'; sensorModule.style.filter = 'grayscale(1)'; }
+                        if(radarPulse) radarPulse.style.display = 'none';
+                        addLog('Sensor lost', 'alert');
+                    }
+                    return;
+                }
+
+                // 2. ДВИЖЕНИЕ
+                if (data.movement) {
+                    const zoneDisplay = document.getElementById('ui-active-zone');
+                    if (zoneDisplay) zoneDisplay.innerText = zoneNames[data.zone] || data.zone;
+                    
+                    document.querySelectorAll('.zone').forEach(z => z.classList.remove('active-red'));
+                    const activeRect = document.getElementById('zone_' + data.zone);
+                    if (activeRect) activeRect.classList.add('active-red');
+
+                    // РАСЧЕТ КООРДИНАТ С RAWX И RAWY
+                    const dot = document.getElementById('tracking-dot');
+                    if (dot && data.rawX !== undefined && data.rawY !== undefined) {
+                        const SENSOR_X = 450; 
+                        const SENSOR_Y = 350;
+                        const ANGLE = -135 * (Math.PI / 180);
+                        const SCALE = 13.0;
+
+                        const rotX = data.rawX * Math.cos(ANGLE) - data.rawY * Math.sin(ANGLE);
+                        const rotY = data.rawX * Math.sin(ANGLE) + data.rawY * Math.cos(ANGLE);
+
+                        const finalX = SENSOR_X + (rotX / SCALE);
+                        const finalY = SENSOR_Y + (rotY / SCALE);
+
+                        dot.style.opacity = '1';
+                        dot.setAttribute('cx', finalX);
+                        dot.setAttribute('cy', finalY);
+                    }
+                    addLog(`Motion: ${zoneNames[data.zone] || data.zone}`, 'warning');
+                }
+            };
+
+            // 3. МАГИЯ АВТО-РЕКОННЕКТА
+            socket.onclose = () => {
+                const statusVal = document.getElementById('ui-sensor-status');
+                if(statusVal) {
+                    statusVal.innerText = 'RECONNECTING...'; 
+                    statusVal.style.color = 'var(--warning)';
+                }
+                // Ждем 3 секунды и пробуем подключиться снова
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        // 4. Запускаем подключение при загрузке страницы
+        connectWebSocket();
+
+
+        // --- ВАШИ ФУНКЦИИ (Остаются без изменений) ---
         function sendSettings() {
             const isArmed = document.getElementById('ui-armed').checked;
             const sensValue = parseInt(document.getElementById('ui-sens').value);
-            
             const payload = { type: 'settings_update', armed: isArmed, sensitivity: sensValue };
             
-            if (socket.readyState === WebSocket.OPEN) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify(payload));
                 addLog(`Settings updated: Filter ${sensValue}cm`, 'info');
             }
@@ -338,7 +412,7 @@
 
         function sendReboot() {
             if(confirm("Вы уверены, что хотите перезагрузить ESP32?")) {
-                if (socket.readyState === WebSocket.OPEN) {
+                if (socket && socket.readyState === WebSocket.OPEN) {
                     socket.send(JSON.stringify({ type: 'settings_update', reboot: true }));
                     addLog('Reboot command sent to hardware', 'alert');
                 }
@@ -365,7 +439,7 @@
             item.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString()}</span><span>${msg}</span>`;
             list.prepend(item);
         }
-
+        
         // ОСНОВНАЯ ЛОГИКА ДАННЫХ
         socket.onmessage = (event) => {
             const data = JSON.parse(event.data);
