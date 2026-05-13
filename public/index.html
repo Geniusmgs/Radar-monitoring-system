@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Presence Monitoring System</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
             --bg-main: #0b1220;
@@ -117,7 +118,7 @@
             transform: scale(1.6); transform-origin: center;
         }
 
-        /* Зоны: временно красные для настройки */
+        /* Зоны */
         .zone {
             fill: rgba(239, 68, 68, 0.1); 
             stroke: rgba(239, 68, 68, 0.3);
@@ -128,15 +129,6 @@
             fill: rgba(239, 68, 68, 0.4);
             stroke: var(--alert);
             filter: drop-shadow(0 0 10px var(--alert));
-        }
-
-        /* Точка человека */
-        .tracking-dot {
-            position: absolute; width: 14px; height: 14px;
-            background: var(--active); border-radius: 50%;
-            box-shadow: 0 0 15px var(--active);
-            z-index: 20; opacity: 0; pointer-events: none;
-            transition: all 0.8s cubic-bezier(0.25, 1, 0.5, 1);
         }
 
         /* Правая панель */
@@ -152,17 +144,18 @@
         .log-time { color: var(--text-sec); font-family: monospace; }
         .log-item.warning { border-left: 2px solid var(--warning); }
         .log-item.alert { border-left: 2px solid var(--alert); }
-/* ==========================================
+        .log-item.info { border-left: 2px solid var(--active); }
+
+        /* ==========================================
            МОБІЛЬНА АДАПТАЦІЯ (Для екранів < 768px)
            ========================================== */
         @media (max-width: 768px) {
             body {
-                flex-direction: column; /* Сайбар переїжджає наверх */
-                overflow-y: auto;       /* Дозволяємо гортати сторінку вниз */
+                flex-direction: column; 
+                overflow-y: auto;       
                 height: auto;
             }
 
-            /* Сайдбар стає горизонтальним меню */
             .sidebar {
                 width: 100%;
                 padding: 15px;
@@ -172,81 +165,39 @@
             }
             .sidebar > div:nth-child(2) {
                 display: flex;
-                overflow-x: auto; /* Горизонтальний скрол для меню */
+                overflow-x: auto; 
                 white-space: nowrap;
                 padding-bottom: 5px;
             }
-            .nav-item {
-                border-left: none;
-                border-bottom: 3px solid transparent;
-            }
+            .nav-item { border-left: none; border-bottom: 3px solid transparent; }
             .nav-item.active {
                 border-left: none;
                 border-bottom: 3px solid var(--active);
                 background: linear-gradient(0deg, rgba(59,130,246,0.1) 0%, transparent 100%);
             }
-            .sys-health {
-                display: none; /* Ховаємо показники системи для економії місця */
-            }
+            .sys-health { display: none; }
 
-            /* Шапка сайту */
-            .header {
-                height: auto;
-                padding: 15px;
-                flex-direction: column;
-                gap: 15px;
-                text-align: center;
-            }
-            .header-title {
-                flex-wrap: wrap;
-                justify-content: center;
-            }
-            .header-right {
-                flex-wrap: wrap;
-                justify-content: center;
-                gap: 12px;
-            }
+            .header { height: auto; padding: 15px; flex-direction: column; gap: 15px; text-align: center; }
+            .header-title { flex-wrap: wrap; justify-content: center; }
+            .header-right { flex-wrap: wrap; justify-content: center; gap: 12px; }
 
-            /* Головний дашборд */
-            .dashboard {
-                grid-template-columns: 1fr; /* Робимо ОДНУ колонку замість двох */
-                grid-template-rows: auto;
-                overflow: visible;
-                padding: 15px;
-                gap: 15px;
-            }
-
-            /* Карта */
-            .map-container {
-                grid-column: 1 / 2;
-                height: 350px; /* Фіксуємо висоту карти для телефону */
-            }
-
-            /* Картки статусів */
-            .status-grid {
-                grid-column: 1 / 2; /* Переносимо під карту */
-            }
-
-            /* Логи */
-            .log-container {
-                grid-column: 1 / 2;
-                height: 300px; /* Обмежуємо висоту списку логів */
-                /* Жесткое правило для скрытия экранов */
-        .view-hidden {
-            display: none !important;
-        }
-            }
+            .dashboard { grid-template-columns: 1fr; grid-template-rows: auto; overflow: visible; padding: 15px; gap: 15px; }
+            .map-container { grid-column: 1 / 2; height: 350px; }
+            .status-grid { grid-column: 1 / 2; }
+            .log-container { grid-column: 1 / 2; height: 300px; }
+            .view-hidden { display: none !important; }
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+<body>
 
     <aside class="sidebar">
         <div class="brand">RadarView UX</div>
         <div style="margin-top: 10px;">
-            <div class="nav-item active" data-target="view-dashboard">⚲ Live Monitoring</div>
-            <div class="nav-item" data-target="view-analytics">◱ Analytics</div>
-            <div class="nav-item" data-target="view-settings">⚙ Settings</div>
+            <div class="nav-item active" data-target="view-dashboard"><i class="fas fa-satellite-dish"></i> Live Monitoring</div>
+            <div class="nav-item" data-target="view-analytics"><i class="fas fa-chart-bar"></i> Analytics</div>
+            <div class="nav-item" data-target="view-settings"><i class="fas fa-cog"></i> Settings</div>
         </div>
         <div class="sys-health">
             <div class="health-row"><span>CPU</span><span>12%</span></div>
@@ -275,12 +226,10 @@
                         <rect id="zone_my_bedroom" class="zone" x="350" y="50" width="80" height="100" rx="2"></rect>
                         <rect id="zone_guest_bedroom" class="zone" x="280" y="50" width="60" height="80" rx="2"></rect>
                         <rect id="zone_balcony_1" class="zone" x="250" y="50" width="25" height="80" rx="2"></rect>
-    
                         <rect id="zone_main_corridor" class="zone" x="280" y="140" width="150" height="40" rx="2"></rect>
                         <rect id="zone_bathroom" class="zone" x="350" y="190" width="80" height="60" rx="2"></rect>
                         <rect id="zone_toilet" class="zone" x="350" y="260" width="80" height="30" rx="2"></rect>
                         <rect id="zone_pantryy" class="zone" x="350" y="300" width="80" height="30" rx="2"></rect>
-
                         <rect id="zone_living_room" class="zone" x="100" y="140" width="170" height="150" rx="2"></rect>
                         <rect id="zone_kitchen" class="zone" x="100" y="300" width="170" height="80" rx="2"></rect>
                         <rect id="zone_balcony_2" class="zone" x="70" y="300" width="25" height="80" rx="2"></rect>
@@ -293,16 +242,16 @@
                         </defs>
 
                         <g id="sensor_module" transform="translate(450, 350) rotate(-135)" style="cursor: grab; opacity: 0.8;">
-                                <path transform="scale(1.2)" d="M 0 0 L -173 -100 A 200 200 0 0 1 173 -100 Z" fill="url(#radarGlow)" stroke="rgba(59,130,246,0.5)" stroke-dasharray="4"></path>
-                                <circle cx="0" cy="0" r="8" fill="#fff"></circle>
-                                <circle id="radar-pulse" cx="0" cy="0" r="10" fill="none" stroke="#3b82f6" stroke-width="2">
-                                    <animate attributeName="r" values="5; 40" dur="2s" repeatCount="indefinite"></animate>
-                                    <animate attributeName="opacity" values="1; 0" dur="2s" repeatCount="indefinite"></animate>
-                                </circle>
-                            </g>
-                        </svg>
+                            <path transform="scale(1.2)" d="M 0 0 L -173 -100 A 200 200 0 0 1 173 -100 Z" fill="url(#radarGlow)" stroke="rgba(59,130,246,0.5)" stroke-dasharray="4"></path>
+                            <circle cx="0" cy="0" r="8" fill="#fff"></circle>
+                            <circle id="radar-pulse" cx="0" cy="0" r="10" fill="none" stroke="#3b82f6" stroke-width="2">
+                                <animate attributeName="r" values="5; 40" dur="2s" repeatCount="indefinite"></animate>
+                                <animate attributeName="opacity" values="1; 0" dur="2s" repeatCount="indefinite"></animate>
+                            </circle>
+                        </g>
 
-                    <div id="tracking-dot" class="tracking-dot"></div>
+                        <circle id="tracking-dot" cx="-50" cy="-50" r="8" fill="var(--active)" style="opacity: 0; filter: drop-shadow(0 0 10px var(--active)); transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);"></circle>
+                    </svg>
                 </div>
             </div>
 
@@ -326,69 +275,61 @@
                 <div id="log-list" class="log-list"></div>
             </div>
         </main>
-    <div id="view-analytics" class="dashboard" style="display: none;">
-        <div class="glass log-container" style="grid-column: 1 / -1; padding: 20px;">
-            <div class="log-header"><i class="fas fa-chart-pie"></i> Zone Activity Distribution (Demo)</div>
-            
-            <div style="position: relative; height: 400px; width: 100%; display: flex; justify-content: center; align-items: center; padding: 20px;">
-                <canvas id="analyticsChart"></canvas>
+
+        <div id="view-analytics" class="dashboard" style="display: none;">
+            <div class="glass log-container" style="grid-column: 1 / -1; padding: 20px;">
+                <div class="log-header"><i class="fas fa-chart-pie"></i> Zone Activity Distribution (Demo)</div>
+                <div style="position: relative; height: 400px; width: 100%; display: flex; justify-content: center; align-items: center; padding: 20px;">
+                    <canvas id="analyticsChart"></canvas>
+                </div>
             </div>
-            
         </div>
-    </div>
 
-<div id="view-settings" class="dashboard" style="display: none;">
-        <div class="glass log-container" style="grid-column: 1 / -1; padding: 30px; height: auto; overflow: visible;">
-            <div class="log-header"><i class="fas fa-cog"></i> System Configuration</div>
-            
-            <div style="display: grid; grid-template-columns: 1fr; gap: 24px; margin-top: 20px;">
+        <div id="view-settings" class="dashboard" style="display: none;">
+            <div class="glass log-container" style="grid-column: 1 / -1; padding: 30px; height: auto; overflow: visible;">
+                <div class="log-header"><i class="fas fa-cog"></i> System Configuration</div>
                 
-                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
-                    <div>
-                        <div style="font-weight: 600; font-size: 15px;">System Armed</div>
-                        <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Enable or disable LD2450 radar detection</div>
+                <div style="display: grid; grid-template-columns: 1fr; gap: 24px; margin-top: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                        <div>
+                            <div style="font-weight: 600; font-size: 15px;">System Armed</div>
+                            <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Enable or disable LD2450 radar detection</div>
+                        </div>
+                        <input id="ui-armed" type="checkbox" checked onchange="sendSettings()" style="width: 20px; height: 20px; cursor: pointer;">
                     </div>
-                    <input id="ui-armed" type="checkbox" checked onchange="sendSettings()" style="width: 20px; height: 20px; cursor: pointer;">
-                </div>
 
-                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
-                    <div style="flex-grow: 1; padding-right: 40px;">
-                        <div style="font-weight: 600; font-size: 15px;">Radar Noise Filter (Distance)</div>
-                        <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Ignore movements closer than <span id="ui-sens-val" style="color: var(--text-main); font-weight: bold;">30</span> cm</div>
-                        <input id="ui-sens" type="range" min="0" max="100" value="30" onchange="sendSettings()" oninput="document.getElementById('ui-sens-val').innerText = this.value" style="width: 100%; margin-top: 15px; cursor: pointer;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                        <div style="flex-grow: 1; padding-right: 40px;">
+                            <div style="font-weight: 600; font-size: 15px;">Radar Noise Filter (Distance)</div>
+                            <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Ignore movements closer than <span id="ui-sens-val" style="color: var(--text-main); font-weight: bold;">30</span> cm</div>
+                            <input id="ui-sens" type="range" min="0" max="100" value="30" onchange="sendSettings()" oninput="document.getElementById('ui-sens-val').innerText = this.value" style="width: 100%; margin-top: 15px; cursor: pointer;">
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px;">
+                        <div>
+                            <div style="font-weight: 600; font-size: 15px;">Restart Hardware</div>
+                            <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Remote reboot of the ESP32-C3 module</div>
+                        </div>
+                        <button onclick="sendReboot()" style="background: var(--alert); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s;">
+                        Reboot ESP32
+                        </button>
                     </div>
                 </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px;">
-                    <div>
-                        <div style="font-weight: 600; font-size: 15px;">Restart Hardware</div>
-                        <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Remote reboot of the ESP32-C3 module</div>
-                    </div>
-                    <button onclick="sendReboot()" style="background: var(--alert); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s;">
-                    Reboot ESP32
-                    </button>
-                </div>
-
             </div>
         </div>
     </div>
 
     <script>
-        // Автоматическое переключение между ws:// (локально) и wss:// (в облаке)
-const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-const socket = new WebSocket(protocol + window.location.host);
-// --- ФУНКЦИИ УПРАВЛЕНИЯ НАСТРОЙКАМИ ---
+        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const socket = new WebSocket(protocol + window.location.host);
+
         function sendSettings() {
             const isArmed = document.getElementById('ui-armed').checked;
             const sensValue = parseInt(document.getElementById('ui-sens').value);
             
-            const payload = {
-                type: 'settings_update',
-                armed: isArmed,
-                sensitivity: sensValue
-            };
+            const payload = { type: 'settings_update', armed: isArmed, sensitivity: sensValue };
             
-            // Отправляем JSON на сервер через WebSocket
             if (socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify(payload));
                 addLog(`Settings updated: Filter ${sensValue}cm`, 'info');
@@ -425,70 +366,59 @@ const socket = new WebSocket(protocol + window.location.host);
             list.prepend(item);
         }
 
-socket.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    const sensorModule = document.getElementById('sensor_module');
-    const radarPulse = document.getElementById('radar-pulse');
+        // ОСНОВНАЯ ЛОГИКА ДАННЫХ
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            const sensorModule = document.getElementById('sensor_module');
+            const radarPulse = document.getElementById('radar-pulse');
 
-    // --- 1. ОБРАБОТКА СТАТУСА (ТВОЙ ОРИГИНАЛЬНЫЙ КОД) ---
-    if (data.type === 'status') {
-        const statusVal = document.getElementById('ui-sensor-status');
-        if (data.status === 'online') {
-            statusVal.innerText = 'ONLINE'; statusVal.style.color = 'var(--online)';
-            if(sensorModule) { sensorModule.style.opacity = '1'; sensorModule.style.filter = 'none'; }
-            if(radarPulse) radarPulse.style.display = 'block';
-            addLog('Sensor established', 'info');
-        } else {
-            statusVal.innerText = 'OFFLINE'; statusVal.style.color = 'var(--alert)';
-            if(sensorModule) { sensorModule.style.opacity = '0.3'; sensorModule.style.filter = 'grayscale(1)'; }
-            if(radarPulse) radarPulse.style.display = 'none';
-            addLog('Sensor lost', 'alert');
-        }
-        return;
-    }
-
-    // --- 2. ОБРАБОТКА ДВИЖЕНИЯ (ИСПРАВЛЕННАЯ ЛОГИКА) ---
-    if (data.movement) {
-        // Обновляем текст зоны
-        const zoneDisplay = document.getElementById('ui-active-zone');
-        if (zoneDisplay) zoneDisplay.innerText = zoneNames[data.zone] || data.zone;
-        
-        // Подсветка комнат (твои классы)
-        document.querySelectorAll('.zone').forEach(z => z.classList.remove('active-red'));
-        const activeRect = document.getElementById('zone_' + data.zone);
-        if (activeRect) activeRect.classList.add('active-red');
-
-        // --- ГЛАВНОЕ: РАСЧЕТ ТОЧКИ ---
-        const dot = document.getElementById('tracking-dot');
-        if (dot && data.x !== undefined && data.y !== undefined) {
-            // Твои настройки из SVG translate(450, 350) и rotate(-135)
-            const SENSOR_X = 450; 
-            const SENSOR_Y = 350;
-            const ANGLE = -135 * (Math.PI / 180);
-            const SCALE = 13.0; // Подбери (10-15), чтобы точка не выходила за стены
-
-            // Математический поворот, чтобы точка не летела сквозь стены
-            const rotX = data.x * Math.cos(ANGLE) - data.y * Math.sin(ANGLE);
-            const rotY = data.x * Math.sin(ANGLE) + data.y * Math.cos(ANGLE);
-
-            const finalX = SENSOR_X + (rotX / SCALE);
-            const finalY = SENSOR_Y + (rotY / SCALE);
-
-            dot.style.opacity = '1';
-
-            // ПРОВЕРКА: Если точка внутри SVG (<circle>), двигаем через cx/cy
-            if (dot.tagName.toLowerCase() === 'circle') {
-                dot.setAttribute('cx', finalX);
-                dot.setAttribute('cy', finalY);
-            } else {
-                // Если это <div> над картой, переводим в проценты от SVG (600x450)
-                dot.style.left = (finalX / 600 * 100) + '%';
-                dot.style.top = (finalY / 450 * 100) + '%';
+            // 1. СТАТУС
+            if (data.type === 'status') {
+                const statusVal = document.getElementById('ui-sensor-status');
+                if (data.status === 'online') {
+                    statusVal.innerText = 'ONLINE'; statusVal.style.color = 'var(--online)';
+                    if(sensorModule) { sensorModule.style.opacity = '1'; sensorModule.style.filter = 'none'; }
+                    if(radarPulse) radarPulse.style.display = 'block';
+                    addLog('Sensor established', 'info');
+                } else {
+                    statusVal.innerText = 'OFFLINE'; statusVal.style.color = 'var(--alert)';
+                    if(sensorModule) { sensorModule.style.opacity = '0.3'; sensorModule.style.filter = 'grayscale(1)'; }
+                    if(radarPulse) radarPulse.style.display = 'none';
+                    addLog('Sensor lost', 'alert');
+                }
+                return;
             }
-        }
-        addLog(`Motion: ${zoneNames[data.zone] || data.zone}`, 'warning');
-    }
-};
+
+            // 2. ДВИЖЕНИЕ
+            if (data.movement) {
+                const zoneDisplay = document.getElementById('ui-active-zone');
+                if (zoneDisplay) zoneDisplay.innerText = zoneNames[data.zone] || data.zone;
+                
+                document.querySelectorAll('.zone').forEach(z => z.classList.remove('active-red'));
+                const activeRect = document.getElementById('zone_' + data.zone);
+                if (activeRect) activeRect.classList.add('active-red');
+
+                // ИСПРАВЛЕННЫЙ РАСЧЕТ КООРДИНАТ С RAWX И RAWY
+                const dot = document.getElementById('tracking-dot');
+                if (dot && data.rawX !== undefined && data.rawY !== undefined) {
+                    const SENSOR_X = 450; 
+                    const SENSOR_Y = 350;
+                    const ANGLE = -135 * (Math.PI / 180);
+                    const SCALE = 13.0;
+
+                    const rotX = data.rawX * Math.cos(ANGLE) - data.rawY * Math.sin(ANGLE);
+                    const rotY = data.rawX * Math.sin(ANGLE) + data.rawY * Math.cos(ANGLE);
+
+                    const finalX = SENSOR_X + (rotX / SCALE);
+                    const finalY = SENSOR_Y + (rotY / SCALE);
+
+                    dot.style.opacity = '1';
+                    dot.setAttribute('cx', finalX);
+                    dot.setAttribute('cy', finalY);
+                }
+                addLog(`Motion: ${zoneNames[data.zone] || data.zone}`, 'warning');
+            }
+        };
 
         // Clock
         setInterval(() => document.getElementById('live-clock').innerText = new Date().toLocaleTimeString(), 1000);
@@ -496,7 +426,7 @@ socket.onmessage = (event) => {
         // Drag & Rotate Logic
         const mapSvg = document.getElementById('map-svg');
         const sensor = document.getElementById('sensor_module');
-        let isDragging = false, currX = 350, currY = 250, currA = -45;
+        let isDragging = false, currX = 450, currY = 350, currA = -135;
 
         function getCoords(e) {
             const ctm = mapSvg.getScreenCTM();
@@ -516,7 +446,8 @@ socket.onmessage = (event) => {
             currA += e.deltaY > 0 ? 5 : -5;
             sensor.setAttribute('transform', `translate(${currX}, ${currY}) rotate(${currA})`);
         });
-        // --- ЛОГИКА ПЕРЕКЛЮЧЕНИЯ ЭКРАНОВ МЕНЮ ---
+
+        // ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ
         const navItems = document.querySelectorAll('.nav-item');
         const views = ['view-dashboard', 'view-analytics', 'view-settings'];
 
@@ -525,43 +456,38 @@ socket.onmessage = (event) => {
                 const targetId = this.getAttribute('data-target');
                 const targetView = document.getElementById(targetId);
 
-                // Защита от зависания, если экрана не существует
                 if (!targetView) return;
 
-                // 1. Убираем подсветку со всех кнопок и скрываем все экраны
                 navItems.forEach(nav => nav.classList.remove('active'));
                 views.forEach(view => document.getElementById(view).style.display = 'none');
 
-                // 2. Делаем нажатую кнопку активной
                 this.classList.add('active');
-
-                // 3. Возвращаем элементу его родной стиль из CSS
                 targetView.style.display = '';
             });
         });
-        // --- ЛОГИКА АНАЛИТИКИ (Chart.js) ---
-        // Настраиваем глобальные цвета под темную тему
+
+        // АНАЛИТИКА
         Chart.defaults.color = '#9fb0d0'; 
         Chart.defaults.font.family = "'Inter', sans-serif";
 
         const ctx = document.getElementById('analyticsChart').getContext('2d');
         const analyticsChart = new Chart(ctx, {
-            type: 'doughnut', // Тип: график-кольцо
+            type: 'doughnut',
             data: {
                 labels: ['Моя спальня', 'Зал', 'Кухня', 'Ванная', 'Коридор'],
                 datasets: [{
                     label: 'Активность (%)',
-                    data: [45, 25, 15, 5, 10], // Демо-данные в процентах
+                    data: [45, 25, 15, 5, 10],
                     backgroundColor: [
-                        'rgba(59, 130, 246, 0.8)',  // Синий (как active)
-                        'rgba(139, 92, 246, 0.8)',  // Фиолетовый
-                        'rgba(16, 185, 129, 0.8)',  // Зеленый (как online)
-                        'rgba(245, 158, 11, 0.8)',  // Оранжевый (как warning)
-                        'rgba(239, 68, 68, 0.8)'    // Красный (как alert)
+                        'rgba(59, 130, 246, 0.8)',
+                        'rgba(139, 92, 246, 0.8)',
+                        'rgba(16, 185, 129, 0.8)',
+                        'rgba(245, 158, 11, 0.8)',
+                        'rgba(239, 68, 68, 0.8)'
                     ],
-                    borderColor: '#111a2e', // Цвет обводки совпадает с панелями
+                    borderColor: '#111a2e',
                     borderWidth: 3,
-                    hoverOffset: 10 // Насколько сектор "выпрыгивает" при наведении
+                    hoverOffset: 10
                 }]
             },
             options: {
@@ -569,14 +495,12 @@ socket.onmessage = (event) => {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        position: window.innerWidth <= 768 ? 'bottom' : 'right', // Для телефона легенда снизу, для ПК - справа
+                        position: window.innerWidth <= 768 ? 'bottom' : 'right',
                         labels: { padding: 20, font: { size: 13 } }
                     },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
-                                return ' ' + context.label + ': ' + context.raw + '% времени';
-                            }
+                            label: function(context) { return ' ' + context.label + ': ' + context.raw + '% времени'; }
                         }
                     }
                 }
