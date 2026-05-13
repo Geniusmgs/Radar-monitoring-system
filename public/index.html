@@ -425,42 +425,70 @@ const socket = new WebSocket(protocol + window.location.host);
             list.prepend(item);
         }
 
-        socket.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            const sensorModule = document.getElementById('sensor_module');
-            const radarPulse = document.getElementById('radar-pulse');
+socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    const sensorModule = document.getElementById('sensor_module');
+    const radarPulse = document.getElementById('radar-pulse');
 
-            if (data.type === 'status') {
-                const statusVal = document.getElementById('ui-sensor-status');
-                if (data.status === 'online') {
-                    statusVal.innerText = 'ONLINE'; statusVal.style.color = 'var(--online)';
-                    sensorModule.style.opacity = '1'; sensorModule.style.filter = 'none';
-                    radarPulse.style.display = 'block';
-                    addLog('Sensor established', 'info');
-                } else {
-                    statusVal.innerText = 'OFFLINE'; statusVal.style.color = 'var(--alert)';
-                    sensorModule.style.opacity = '0.3'; sensorModule.style.filter = 'grayscale(1)';
-                    radarPulse.style.display = 'none';
-                    addLog('Sensor lost', 'alert');
-                }
-                return;
+    // --- 1. ОБРАБОТКА СТАТУСА (ТВОЙ ОРИГИНАЛЬНЫЙ КОД) ---
+    if (data.type === 'status') {
+        const statusVal = document.getElementById('ui-sensor-status');
+        if (data.status === 'online') {
+            statusVal.innerText = 'ONLINE'; statusVal.style.color = 'var(--online)';
+            if(sensorModule) { sensorModule.style.opacity = '1'; sensorModule.style.filter = 'none'; }
+            if(radarPulse) radarPulse.style.display = 'block';
+            addLog('Sensor established', 'info');
+        } else {
+            statusVal.innerText = 'OFFLINE'; statusVal.style.color = 'var(--alert)';
+            if(sensorModule) { sensorModule.style.opacity = '0.3'; sensorModule.style.filter = 'grayscale(1)'; }
+            if(radarPulse) radarPulse.style.display = 'none';
+            addLog('Sensor lost', 'alert');
+        }
+        return;
+    }
+
+    // --- 2. ОБРАБОТКА ДВИЖЕНИЯ (ИСПРАВЛЕННАЯ ЛОГИКА) ---
+    if (data.movement) {
+        // Обновляем текст зоны
+        const zoneDisplay = document.getElementById('ui-active-zone');
+        if (zoneDisplay) zoneDisplay.innerText = zoneNames[data.zone] || data.zone;
+        
+        // Подсветка комнат (твои классы)
+        document.querySelectorAll('.zone').forEach(z => z.classList.remove('active-red'));
+        const activeRect = document.getElementById('zone_' + data.zone);
+        if (activeRect) activeRect.classList.add('active-red');
+
+        // --- ГЛАВНОЕ: РАСЧЕТ ТОЧКИ ---
+        const dot = document.getElementById('tracking-dot');
+        if (dot && data.x !== undefined && data.y !== undefined) {
+            // Твои настройки из SVG translate(450, 350) и rotate(-135)
+            const SENSOR_X = 450; 
+            const SENSOR_Y = 350;
+            const ANGLE = -135 * (Math.PI / 180);
+            const SCALE = 13.0; // Подбери (10-15), чтобы точка не выходила за стены
+
+            // Математический поворот, чтобы точка не летела сквозь стены
+            const rotX = data.x * Math.cos(ANGLE) - data.y * Math.sin(ANGLE);
+            const rotY = data.x * Math.sin(ANGLE) + data.y * Math.cos(ANGLE);
+
+            const finalX = SENSOR_X + (rotX / SCALE);
+            const finalY = SENSOR_Y + (rotY / SCALE);
+
+            dot.style.opacity = '1';
+
+            // ПРОВЕРКА: Если точка внутри SVG (<circle>), двигаем через cx/cy
+            if (dot.tagName.toLowerCase() === 'circle') {
+                dot.setAttribute('cx', finalX);
+                dot.setAttribute('cy', finalY);
+            } else {
+                // Если это <div> над картой, переводим в проценты от SVG (600x450)
+                dot.style.left = (finalX / 600 * 100) + '%';
+                dot.style.top = (finalY / 450 * 100) + '%';
             }
-
-            if (data.movement) {
-                document.getElementById('ui-active-zone').innerText = zoneNames[data.zone] || data.zone;
-                
-                document.querySelectorAll('.zone').forEach(z => z.classList.remove('active-red'));
-                const activeRect = document.getElementById('zone_' + data.zone);
-                if (activeRect) activeRect.classList.add('active-red');
-
-                const dot = document.getElementById('tracking-dot');
-                if (data.x !== undefined) {
-                    dot.style.opacity = '1';
-                    dot.style.left = data.x + '%'; dot.style.top = data.y + '%';
-                }
-                addLog(`Motion: ${zoneNames[data.zone]}`, 'warning');
-            }
-        };
+        }
+        addLog(`Motion: ${zoneNames[data.zone] || data.zone}`, 'warning');
+    }
+};
 
         // Clock
         setInterval(() => document.getElementById('live-clock').innerText = new Date().toLocaleTimeString(), 1000);
