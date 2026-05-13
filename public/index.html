@@ -473,19 +473,33 @@
                 if (activeRect) activeRect.classList.add('active-red');
 
                 // ИСПРАВЛЕННЫЙ РАСЧЕТ КООРДИНАТ С RAWX И RAWY
+// --- ВЕКТОРНЫЙ РАСЧЕТ КООРДИНАТ (С защитой от перевернутой оси Y) ---
                 const dot = document.getElementById('tracking-dot');
+
                 if (dot && data.rawX !== undefined && data.rawY !== undefined) {
                     const SENSOR_X = 450; 
                     const SENSOR_Y = 350;
-                    const ANGLE = -135 * (Math.PI / 180);
-                    const SCALE = 13.0;
+                    
+                    // МАСШТАБ: Если точка "летает" слишком сильно, увеличь это число (например, до 30 или 40)
+                    // Если ползает слишком медленно - уменьши до 15.
+                    const SCALE = 25.0; 
 
-                    const rotX = data.rawX * Math.cos(ANGLE) - data.rawY * Math.sin(ANGLE);
-                    const rotY = data.rawX * Math.sin(ANGLE) + data.rawY * Math.cos(ANGLE);
+                    // Вектор 1: Движение ВПЕРЕД от радара (rawY)
+                    // Радар смотрит в левый-верхний угол (-135°).
+                    // Значит шаг вперед = минус X (влево) и минус Y (вверх по экрану).
+                    const dx_forward = data.rawY * -0.707;
+                    const dy_forward = data.rawY * -0.707;
 
-                    const finalX = SENSOR_X + (rotX / SCALE);
-                    const finalY = SENSOR_Y + (rotY / SCALE);
+                    // Вектор 2: Движение ВПРАВО относительно радара (rawX)
+                    // Шаг вправо от луча = плюс X (вправо) и минус Y (вверх по экрану).
+                    const dx_lateral = data.rawX * 0.707;
+                    const dy_lateral = data.rawX * -0.707;
 
+                    // Складываем векторы и применяем масштаб
+                    const finalX = SENSOR_X + ((dx_forward + dx_lateral) / SCALE);
+                    const finalY = SENSOR_Y + ((dy_forward + dy_lateral) / SCALE);
+
+                    // Двигаем точку
                     dot.style.opacity = '1';
                     dot.setAttribute('cx', finalX);
                     dot.setAttribute('cy', finalY);
