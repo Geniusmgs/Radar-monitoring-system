@@ -328,6 +328,8 @@
         function connectWebSocket() {
             socket = new WebSocket(protocol + window.location.host);
 
+            let lastLoggedZone = null;
+
             // ОСНОВНАЯ ЛОГИКА ДАННЫХ (теперь она привязана к текущему подключению)
             socket.onmessage = (event) => {
                 const data = JSON.parse(event.data);
@@ -378,6 +380,13 @@
                         dot.style.opacity = '1';
                         dot.setAttribute('cx', finalX);
                         dot.setAttribute('cy', finalY);
+                        
+                        if (data.zone !== lastLoggedZone) {
+                        const niceZoneName = zoneNames[data.zone] || data.zone;
+                        addLog(`Entered: ${niceZoneName}`, 'warning');
+                        
+                        // Запоминаем, что мы теперь в этой зоне
+                        lastLoggedZone = data.zone;
                     }
                     addLog(`Motion: ${zoneNames[data.zone] || data.zone}`, 'warning');
                 }
@@ -438,7 +447,14 @@
             const item = document.createElement('div');
             item.className = `log-item ${type}`;
             item.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString()}</span><span>${msg}</span>`;
+            
+            // Добавляем новую запись наверх
             list.prepend(item);
+
+            // Если записей стало больше 50, удаляем самую старую (нижнюю)
+            if (list.children.length > 50) {
+                list.removeChild(list.lastChild);
+            }
         }
         
         // ОСНОВНАЯ ЛОГИКА ДАННЫХ
