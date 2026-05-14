@@ -250,7 +250,7 @@
                             </circle>
                         </g>
 
-                        <circle id="tracking-dot" cx="-50" cy="-50" r="8" fill="var(--active)" style="opacity: 0; filter: drop-shadow(0 0 10px var(--active)); transition: cx 0.1s linear, cy 0.1s linear;"></circle>
+                    <circle id="tracking-dot" cx="-50" cy="-50" r="8" fill="var(--active)" style="opacity: 0; filter: drop-shadow(0 0 10px var(--active)); transition: cx 0.1s linear, cy 0.1s linear;"></circle>
                     </svg>
                 </div>
             </div>
@@ -363,9 +363,10 @@
                     // РАСЧЕТ КООРДИНАТ С RAWX И RAWY
                     const dot = document.getElementById('tracking-dot');
                     if (dot && data.rawX !== undefined && data.rawY !== undefined) {
-                        const SENSOR_X = 450; 
-                        const SENSOR_Y = 350;
-                        const ANGLE = -135 * (Math.PI / 180);
+                        // Теперь берем текущие координаты датчика, куда бы ты его не перетащил!
+                        const SENSOR_X = currX; 
+                        const SENSOR_Y = currY;
+                        const ANGLE = currA * (Math.PI / 180);
                         const SCALE = 13.0;
 
                         const rotX = data.rawX * Math.cos(ANGLE) - data.rawY * Math.sin(ANGLE);
@@ -512,27 +513,53 @@
         setInterval(() => document.getElementById('live-clock').innerText = new Date().toLocaleTimeString(), 1000);
 
         // Drag & Rotate Logic
+// --- Drag & Rotate Logic + СОХРАНЕНИЕ В ПАМЯТЬ ---
         const mapSvg = document.getElementById('map-svg');
         const sensor = document.getElementById('sensor_module');
-        let isDragging = false, currX = 450, currY = 350, currA = -135;
+        
+        // 1. Пытаемся прочитать сохраненные данные. Если их нет - берем дефолтные (450, 350, -135)
+        let currX = parseFloat(localStorage.getItem('sensorX')) || 450;
+        let currY = parseFloat(localStorage.getItem('sensorY')) || 350;
+        let currA = parseFloat(localStorage.getItem('sensorA')) || -135;
+
+        // Сразу ставим датчик на сохраненное место при загрузке страницы
+        if(sensor) {
+            sensor.setAttribute('transform', `translate(${currX}, ${currY}) rotate(${currA})`);
+        }
+
+        let isDragging = false;
 
         function getCoords(e) {
             const ctm = mapSvg.getScreenCTM();
             return { x: (e.clientX - ctm.e) / ctm.a, y: (e.clientY - ctm.f) / ctm.d };
         }
 
+        // Функция сохранения
+        function saveSensorPosition() {
+            localStorage.setItem('sensorX', currX);
+            localStorage.setItem('sensorY', currY);
+            localStorage.setItem('sensorA', currA);
+        }
+
         sensor.addEventListener('mousedown', () => { isDragging = true; sensor.style.cursor = 'grabbing'; });
+        
         mapSvg.addEventListener('mousemove', (e) => {
             if (isDragging) {
-                const c = getCoords(e); currX = c.x; currY = c.y;
+                const c = getCoords(e); 
+                currX = c.x; 
+                currY = c.y;
                 sensor.setAttribute('transform', `translate(${currX}, ${currY}) rotate(${currA})`);
+                saveSensorPosition(); // Сохраняем при каждом сдвиге
             }
         });
+        
         window.addEventListener('mouseup', () => { isDragging = false; sensor.style.cursor = 'grab'; });
+        
         sensor.addEventListener('wheel', (e) => {
             e.preventDefault();
             currA += e.deltaY > 0 ? 5 : -5;
             sensor.setAttribute('transform', `translate(${currX}, ${currY}) rotate(${currA})`);
+            saveSensorPosition(); // Сохраняем при каждом повороте
         });
 
         // ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ
