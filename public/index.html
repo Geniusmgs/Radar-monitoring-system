@@ -229,7 +229,8 @@
                         <rect id="zone_main_corridor" class="zone" x="280" y="140" width="150" height="40" rx="2"></rect>
                         <rect id="zone_bathroom" class="zone" x="350" y="190" width="80" height="60" rx="2"></rect>
                         <rect id="zone_toilet" class="zone" x="350" y="260" width="80" height="30" rx="2"></rect>
-                        <rect id="zone_pantryy" class="zone" x="350" y="300" width="80" height="30" rx="2"></rect>
+                        <!-- ИСПРАВЛЕНА ОПЕЧАТКА: zone_pantry вместо zone_pantryy -->
+                        <rect id="zone_pantry" class="zone" x="350" y="300" width="80" height="30" rx="2"></rect>
                         <rect id="zone_living_room" class="zone" x="100" y="140" width="170" height="150" rx="2"></rect>
                         <rect id="zone_kitchen" class="zone" x="100" y="300" width="170" height="80" rx="2"></rect>
                         <rect id="zone_balcony_2" class="zone" x="70" y="300" width="25" height="80" rx="2"></rect>
@@ -250,7 +251,7 @@
                             </circle>
                         </g>
 
-                    <circle id="tracking-dot" cx="-50" cy="-50" r="8" fill="var(--active)" style="opacity: 0; filter: drop-shadow(0 0 10px var(--active)); transition: cx 0.1s linear, cy 0.1s linear;"></circle>
+                        <circle id="tracking-dot" cx="-50" cy="-50" r="8" fill="var(--active)" style="opacity: 0; filter: drop-shadow(0 0 10px var(--active)); transition: cx 0.1s linear, cy 0.1s linear;"></circle>
                     </svg>
                 </div>
             </div>
@@ -320,17 +321,19 @@
         </div>
     </div>
 
-<script>
+    <script>
         const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-        let socket; // 1. Объявляем сокет здесь, чтобы его видели ВСЕ функции
+        let socket; 
+        
+        // 1. Инициализация координат радара из памяти (Должна быть ДО запуска сокета!)
+        let currX = parseFloat(localStorage.getItem('sensorX')) || 450;
+        let currY = parseFloat(localStorage.getItem('sensorY')) || 350;
+        let currA = parseFloat(localStorage.getItem('sensorA')) || -135;
 
-        // 2. Создаем функцию-оболочку для подключения
         function connectWebSocket() {
             socket = new WebSocket(protocol + window.location.host);
+            let lastLoggedZone = null; // Переменная для анти-спама логов
 
-            let lastLoggedZone = null;
-
-            // ОСНОВНАЯ ЛОГИКА ДАННЫХ (теперь она привязана к текущему подключению)
             socket.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 const sensorModule = document.getElementById('sensor_module');
@@ -365,41 +368,40 @@
                     // РАСЧЕТ КООРДИНАТ С RAWX И RAWY
                     const dot = document.getElementById('tracking-dot');
                     if (dot && data.rawX !== undefined && data.rawY !== undefined) {
-                        // Теперь берем текущие координаты датчика, куда бы ты его не перетащил!
                         const SENSOR_X = currX; 
                         const SENSOR_Y = currY;
                         const ANGLE = currA * (Math.PI / 180);
-                        const SCALE = 13.0;
+                        const SCALE = 25.0; 
 
-                        const rotX = data.rawX * Math.cos(ANGLE) - data.rawY * Math.sin(ANGLE);
-                        const rotY = data.rawX * Math.sin(ANGLE) + data.rawY * Math.cos(ANGLE);
+                        const dx_forward = data.rawY * -0.707;
+                        const dy_forward = data.rawY * -0.707;
+                        const dx_lateral = data.rawX * 0.707;
+                        const dy_lateral = data.rawX * -0.707;
 
-                        const finalX = SENSOR_X + (rotX / SCALE);
-                        const finalY = SENSOR_Y + (rotY / SCALE);
+                        const finalX = SENSOR_X + ((dx_forward + dx_lateral) / SCALE);
+                        const finalY = SENSOR_Y + ((dy_forward + dy_lateral) / SCALE);
 
                         dot.style.opacity = '1';
                         dot.setAttribute('cx', finalX);
                         dot.setAttribute('cy', finalY);
-                        
-                        if (data.zone !== lastLoggedZone) {
+                    }
+
+                    // АНТИ-СПАМ ЛОГОВ (Пишем только при смене зоны)
+                    if (data.zone !== lastLoggedZone) {
                         const niceZoneName = zoneNames[data.zone] || data.zone;
                         addLog(`Entered: ${niceZoneName}`, 'warning');
-                        
-                        // Запоминаем, что мы теперь в этой зоне
                         lastLoggedZone = data.zone;
                     }
-                    addLog(`Motion: ${zoneNames[data.zone] || data.zone}`, 'warning');
                 }
             };
 
-            // 3. МАГИЯ АВТО-РЕКОННЕКТА
+            // 3. АВТО-РЕКОННЕКТ
             socket.onclose = () => {
                 const statusVal = document.getElementById('ui-sensor-status');
                 if(statusVal) {
                     statusVal.innerText = 'RECONNECTING...'; 
                     statusVal.style.color = 'var(--warning)';
                 }
-                // Ждем 3 секунды и пробуем подключиться снова
                 setTimeout(connectWebSocket, 3000);
             };
         }
@@ -407,8 +409,7 @@
         // 4. Запускаем подключение при загрузке страницы
         connectWebSocket();
 
-
-        // --- ВАШИ ФУНКЦИИ (Остаются без изменений) ---
+        // --- ВАШИ ФУНКЦИИ ---
         function sendSettings() {
             const isArmed = document.getElementById('ui-armed').checked;
             const sensValue = parseInt(document.getElementById('ui-sens').value);
@@ -442,102 +443,27 @@
             'balcony_2': 'Balcony #2'
         };
 
+        // ИСПРАВЛЕННАЯ ФУНКЦИЯ ЛОГОВ С ОЧИСТКОЙ ПАМЯТИ
         function addLog(msg, type) {
             const list = document.getElementById('log-list');
             const item = document.createElement('div');
             item.className = `log-item ${type}`;
             item.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString()}</span><span>${msg}</span>`;
-            
-            // Добавляем новую запись наверх
             list.prepend(item);
 
-            // Если записей стало больше 50, удаляем самую старую (нижнюю)
+            // Удаляем старые логи, если их больше 50
             if (list.children.length > 50) {
                 list.removeChild(list.lastChild);
             }
         }
-        
-        // ОСНОВНАЯ ЛОГИКА ДАННЫХ
-        socket.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            const sensorModule = document.getElementById('sensor_module');
-            const radarPulse = document.getElementById('radar-pulse');
-
-            // 1. СТАТУС
-            if (data.type === 'status') {
-                const statusVal = document.getElementById('ui-sensor-status');
-                if (data.status === 'online') {
-                    statusVal.innerText = 'ONLINE'; statusVal.style.color = 'var(--online)';
-                    if(sensorModule) { sensorModule.style.opacity = '1'; sensorModule.style.filter = 'none'; }
-                    if(radarPulse) radarPulse.style.display = 'block';
-                    addLog('Sensor established', 'info');
-                } else {
-                    statusVal.innerText = 'OFFLINE'; statusVal.style.color = 'var(--alert)';
-                    if(sensorModule) { sensorModule.style.opacity = '0.3'; sensorModule.style.filter = 'grayscale(1)'; }
-                    if(radarPulse) radarPulse.style.display = 'none';
-                    addLog('Sensor lost', 'alert');
-                }
-                return;
-            }
-
-            // 2. ДВИЖЕНИЕ
-            if (data.movement) {
-                const zoneDisplay = document.getElementById('ui-active-zone');
-                if (zoneDisplay) zoneDisplay.innerText = zoneNames[data.zone] || data.zone;
-                
-                document.querySelectorAll('.zone').forEach(z => z.classList.remove('active-red'));
-                const activeRect = document.getElementById('zone_' + data.zone);
-                if (activeRect) activeRect.classList.add('active-red');
-
-                // ИСПРАВЛЕННЫЙ РАСЧЕТ КООРДИНАТ С RAWX И RAWY
-// --- ВЕКТОРНЫЙ РАСЧЕТ КООРДИНАТ (С защитой от перевернутой оси Y) ---
-                const dot = document.getElementById('tracking-dot');
-
-                if (dot && data.rawX !== undefined && data.rawY !== undefined) {
-                    const SENSOR_X = 450; 
-                    const SENSOR_Y = 350;
-                    
-                    // МАСШТАБ: Если точка "летает" слишком сильно, увеличь это число (например, до 30 или 40)
-                    // Если ползает слишком медленно - уменьши до 15.
-                    const SCALE = 25.0; 
-
-                    // Вектор 1: Движение ВПЕРЕД от радара (rawY)
-                    // Радар смотрит в левый-верхний угол (-135°).
-                    // Значит шаг вперед = минус X (влево) и минус Y (вверх по экрану).
-                    const dx_forward = data.rawY * -0.707;
-                    const dy_forward = data.rawY * -0.707;
-
-                    // Вектор 2: Движение ВПРАВО относительно радара (rawX)
-                    // Шаг вправо от луча = плюс X (вправо) и минус Y (вверх по экрану).
-                    const dx_lateral = data.rawX * 0.707;
-                    const dy_lateral = data.rawX * -0.707;
-
-                    // Складываем векторы и применяем масштаб
-                    const finalX = SENSOR_X + ((dx_forward + dx_lateral) / SCALE);
-                    const finalY = SENSOR_Y + ((dy_forward + dy_lateral) / SCALE);
-
-                    // Двигаем точку
-                    dot.style.opacity = '1';
-                    dot.setAttribute('cx', finalX);
-                    dot.setAttribute('cy', finalY);
-                }
-                addLog(`Motion: ${zoneNames[data.zone] || data.zone}`, 'warning');
-            }
-        };
 
         // Clock
         setInterval(() => document.getElementById('live-clock').innerText = new Date().toLocaleTimeString(), 1000);
 
-        // Drag & Rotate Logic
-// --- Drag & Rotate Logic + СОХРАНЕНИЕ В ПАМЯТЬ ---
+        // --- Drag & Rotate Logic + СОХРАНЕНИЕ В ПАМЯТЬ ---
         const mapSvg = document.getElementById('map-svg');
         const sensor = document.getElementById('sensor_module');
         
-        // 1. Пытаемся прочитать сохраненные данные. Если их нет - берем дефолтные (450, 350, -135)
-        let currX = parseFloat(localStorage.getItem('sensorX')) || 450;
-        let currY = parseFloat(localStorage.getItem('sensorY')) || 350;
-        let currA = parseFloat(localStorage.getItem('sensorA')) || -135;
-
         // Сразу ставим датчик на сохраненное место при загрузке страницы
         if(sensor) {
             sensor.setAttribute('transform', `translate(${currX}, ${currY}) rotate(${currA})`);
@@ -550,7 +476,6 @@
             return { x: (e.clientX - ctm.e) / ctm.a, y: (e.clientY - ctm.f) / ctm.d };
         }
 
-        // Функция сохранения
         function saveSensorPosition() {
             localStorage.setItem('sensorX', currX);
             localStorage.setItem('sensorY', currY);
@@ -565,7 +490,7 @@
                 currX = c.x; 
                 currY = c.y;
                 sensor.setAttribute('transform', `translate(${currX}, ${currY}) rotate(${currA})`);
-                saveSensorPosition(); // Сохраняем при каждом сдвиге
+                saveSensorPosition(); 
             }
         });
         
@@ -575,7 +500,7 @@
             e.preventDefault();
             currA += e.deltaY > 0 ? 5 : -5;
             sensor.setAttribute('transform', `translate(${currX}, ${currY}) rotate(${currA})`);
-            saveSensorPosition(); // Сохраняем при каждом повороте
+            saveSensorPosition(); 
         });
 
         // ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ
