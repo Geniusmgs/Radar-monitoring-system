@@ -318,6 +318,49 @@
                         <button onclick="sendReboot()" style="background: var(--alert); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s;">
                         Reboot ESP32
                         </button>
+                        <div class="zoom-controls">
+                            <i class="fas fa-search-minus"></i>
+                            <input type="range" id="map-zoom-slider" min="0.2" max="3.0" step="0.1" value="0.6">
+                            <i class="fas fa-search-plus"></i>
+                        </div>
+                    </div> ```
+
+### Шаг 2: Наводим красоту (CSS)
+Чтобы ползунок стильно висел в правом нижнем углу карты и подходил под твой темный дизайн, скопируй этот код и вставь его куда-нибудь внутрь тега `<style>` (например, в самый низ, прямо перед `</style>`):
+
+```css
+        /* --- Стили для ползунка зума --- */
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(17, 26, 46, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 100;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: opacity 0.3s ease;
+        }
+        
+        .zoom-controls:hover {
+            background: rgba(22, 35, 61, 0.9);
+        }
+
+        .zoom-controls input[type="range"] {
+            width: 120px;
+            cursor: pointer;
+            accent-color: var(--active); /* Синий цвет под стиль сайта */
+        }
+
+        .zoom-controls i {
+            color: var(--text-sec);
+            font-size: 14px;
+        }
                     </div>
                 </div>
             </div>
