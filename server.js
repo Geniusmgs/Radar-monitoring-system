@@ -111,23 +111,4 @@ function broadcast(payload) {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Сервер Pidkamennyi O.M. запущен на порту ${PORT}`);
-// --- ЛОГИКА ЗУМА КАРТЫ (С памятью) ---
-        const mapZoomSlider = document.getElementById('map-zoom-slider');
-        const mapScalerObj = document.querySelector('.map-scaler');
-
-        // Читаем сохраненный масштаб из памяти (или ставим 0.6 по умолчанию)
-        let currentMapZoom = parseFloat(localStorage.getItem('mapScaleLevel')) || 0.6;
-        
-        // Применяем сохраненный масштаб при старте страницы
-        mapZoomSlider.value = currentMapZoom;
-        mapScalerObj.style.transform = `scale(${currentMapZoom})`;
-
-        // Слушаем движения ползунка
-        mapZoomSlider.addEventListener('input', (e) => {
-            currentMapZoom = e.target.value;
-            // Плавно меняем размер
-            mapScalerObj.style.transform = `scale(${currentMapZoom})`;
-            // Сохраняем настройку, чтобы после F5 зум остался таким же
-            localStorage.setItem('mapScaleLevel', currentMapZoom);
-        });
 });
