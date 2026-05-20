@@ -100,7 +100,7 @@
             flex: 1; padding: 24px;
             display: grid; gap: 24px;
             grid-template-columns: 1fr 320px;
-            grid-template-rows: auto auto 1fr; /* Додали рядок для камери */
+            grid-template-rows: auto auto 1fr;
             overflow: hidden;
         }
 
@@ -127,7 +127,7 @@
             filter: drop-shadow(0 0 10px var(--alert));
         }
 
-        /* === НОВЕ: Контейнер камери === */
+        /* Контейнер камери */
         .camera-window {
             position: relative; height: 180px; overflow: hidden;
             background: #000; display: flex; justify-content: center; align-items: center;
@@ -166,8 +166,30 @@
         .zoom-controls input[type="range"] { width: 120px; cursor: pointer; accent-color: var(--active); }
         .zoom-controls i { color: var(--text-sec); font-size: 14px; }
 
-        /* Налаштування */
-        .settings-row { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+        /* === НОВЕ: Дизайн налаштувань === */
+        .settings-section {
+            margin-bottom: 24px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+        .settings-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        .section-heading {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--active);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .settings-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .settings-row:last-child { margin-bottom: 0; }
         .settings-input { background: var(--bg-main); color: #fff; border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; outline: none; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -279,9 +301,10 @@
 
         <div id="view-settings" class="dashboard" style="display: none;">
             <div class="glass log-container" style="grid-column: 1 / -1; padding: 30px; height: auto; overflow: visible;">
-                <div class="log-header" style="font-size: 16px;"><i class="fas fa-cog"></i> System Configuration</div>
                 
-                <div style="margin-top: 20px;">
+                <div class="settings-section">
+                    <h3 class="section-heading"><i class="fas fa-satellite-dish"></i> Налаштування Радара (LD2450)</h3>
+                    
                     <div class="settings-row">
                         <div>
                             <div style="font-weight: 600; font-size: 15px;">System Armed</div>
@@ -292,10 +315,25 @@
 
                     <div class="settings-row">
                         <div>
+                            <div style="font-weight: 600; font-size: 15px;">Сліпа зона (Чутливість)</div>
+                            <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Відстань ігнорування сигналів навколо радара</div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input id="ui-sens" type="number" value="30" min="0" max="200" onchange="sendSettings()" class="settings-input" style="width: 80px;">
+                            <span style="color: var(--text-sec); font-size: 14px;">см</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3 class="section-heading"><i class="fas fa-video"></i> Налаштування Камери (ESP32-CAM)</h3>
+                    
+                    <div class="settings-row">
+                        <div>
                             <div style="font-weight: 600; font-size: 15px;">Режим роботи камери</div>
                             <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Увімкнення по руху для економії трафіку</div>
                         </div>
-                        <select id="sett-cam-mode" onchange="saveCameraSettings()" class="settings-input">
+                        <select id="sett-cam-mode" onchange="saveCameraSettings()" class="settings-input" style="width: 200px;">
                             <option value="on_motion">Тільки при русі (Сон)</option>
                             <option value="always_on">Завжди увімкнена</option>
                         </select>
@@ -306,10 +344,14 @@
                             <div style="font-weight: 600; font-size: 15px;">IP-адреса ESP32-CAM</div>
                             <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Локальна адреса потоку у вашій мережі</div>
                         </div>
-                        <input type="text" id="sett-cam-ip" placeholder="напр. 192.168.1.50" onchange="saveCameraSettings()" class="settings-input">
+                        <input type="text" id="sett-cam-ip" placeholder="напр. 192.168.1.50" onchange="saveCameraSettings()" class="settings-input" style="width: 200px;">
                     </div>
+                </div>
 
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px;">
+                <div class="settings-section">
+                    <h3 class="section-heading"><i class="fas fa-microchip"></i> Системні налаштування</h3>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
                             <div style="font-weight: 600; font-size: 15px;">Restart Hardware</div>
                             <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Віддалене перезавантаження ESP32-C3</div>
@@ -319,6 +361,7 @@
                         </button>
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
@@ -497,12 +540,20 @@
 
         connectWebSocket();
 
+        // ОНОВЛЕНО: Відправка налаштувань радара (озброєння + чутливість)
         function sendSettings() {
             const isArmed = document.getElementById('ui-armed').checked;
-            const payload = { type: 'settings_update', armed: isArmed };
+            const sensValue = parseInt(document.getElementById('ui-sens').value) || 30; // Беремо значення чутливості
+            
+            const payload = { 
+                type: 'settings_update', 
+                armed: isArmed,
+                sensitivity: sensValue 
+            };
+            
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify(payload));
-                addLog(`System Armed: ${isArmed}`, 'info');
+                addLog(`Налаштування оновлено (Фільтр: ${sensValue} см)`, 'info');
             }
         }
 
