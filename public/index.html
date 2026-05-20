@@ -79,9 +79,6 @@
             color: var(--active); background: linear-gradient(90deg, rgba(59,130,246,0.1) 0%, transparent 100%);
             border-left: 3px solid var(--active);
         }
-        
-        .sys-health { margin-top: auto; padding: 20px 24px; border-top: 1px solid var(--border); }
-        .health-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 8px; color: var(--text-sec); }
 
         /* Main Content */
         .main-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -103,13 +100,13 @@
             flex: 1; padding: 24px;
             display: grid; gap: 24px;
             grid-template-columns: 1fr 320px;
-            grid-template-rows: auto 1fr;
+            grid-template-rows: auto auto 1fr; /* Додали рядок для камери */
             overflow: hidden;
         }
 
         /* Map */
         .map-container {
-            grid-column: 1 / 2; grid-row: 1 / 3;
+            grid-column: 1 / 2; grid-row: 1 / 4;
             position: relative; overflow: hidden;
             display: flex; justify-content: center; align-items: center;
         }
@@ -118,7 +115,6 @@
             transform-origin: center;
         }
 
-        /* Зоны */
         .zone {
             fill: rgba(239, 68, 68, 0.1); 
             stroke: rgba(239, 68, 68, 0.3);
@@ -131,7 +127,22 @@
             filter: drop-shadow(0 0 10px var(--alert));
         }
 
-        /* Правая панель */
+        /* === НОВЕ: Контейнер камери === */
+        .camera-window {
+            position: relative; height: 180px; overflow: hidden;
+            background: #000; display: flex; justify-content: center; align-items: center;
+            border-radius: 14px; border: 1px solid var(--border);
+        }
+        #camera-feed { width: 100%; height: 100%; object-fit: cover; transition: opacity 0.5s ease; }
+        .camera-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: rgba(11, 18, 32, 0.9); gap: 10px; z-index: 5; transition: opacity 0.5s ease;
+        }
+        .camera-overlay i { font-size: 32px; color: var(--text-sec); }
+        .camera-label { font-size: 12px; color: var(--text-sec); text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Права панель */
         .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         .stat-card { padding: 16px; }
         .stat-label { font-size: 10px; color: var(--text-sec); text-transform: uppercase; margin-bottom: 4px; }
@@ -146,50 +157,18 @@
         .log-item.alert { border-left: 2px solid var(--alert); }
         .log-item.info { border-left: 2px solid var(--active); }
 
-        /* Стили для ползунка зума */
         .zoom-controls {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(17, 26, 46, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 10px 16px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            z-index: 100;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            transition: opacity 0.3s ease;
+            position: absolute; bottom: 20px; right: 20px;
+            background: rgba(17, 26, 46, 0.7); backdrop-filter: blur(10px);
+            border: 1px solid var(--border); border-radius: 12px;
+            padding: 10px 16px; display: flex; align-items: center; gap: 12px; z-index: 100;
         }
-        .zoom-controls:hover { background: rgba(22, 35, 61, 0.9); }
         .zoom-controls input[type="range"] { width: 120px; cursor: pointer; accent-color: var(--active); }
         .zoom-controls i { color: var(--text-sec); font-size: 14px; }
 
-        /* ==========================================
-           МОБІЛЬНА АДАПТАЦІЯ (Для екранів < 768px)
-           ========================================== */
-        @media (max-width: 768px) {
-            body { flex-direction: column; overflow-y: auto; height: auto; }
-            .sidebar { width: 100%; padding: 15px; border-right: none; border-bottom: 1px solid var(--border); flex-direction: column; }
-            .sidebar > div:nth-child(2) { display: flex; overflow-x: auto; white-space: nowrap; padding-bottom: 5px; }
-            .nav-item { border-left: none; border-bottom: 3px solid transparent; }
-            .nav-item.active {
-                border-left: none;
-                border-bottom: 3px solid var(--active);
-                background: linear-gradient(0deg, rgba(59,130,246,0.1) 0%, transparent 100%);
-            }
-            .sys-health { display: none; }
-            .header { height: auto; padding: 15px; flex-direction: column; gap: 15px; text-align: center; }
-            .header-title { flex-wrap: wrap; justify-content: center; }
-            .header-right { flex-wrap: wrap; justify-content: center; gap: 12px; }
-            .dashboard { grid-template-columns: 1fr; grid-template-rows: auto; overflow: visible; padding: 15px; gap: 15px; }
-            .map-container { grid-column: 1 / 2; height: 350px; }
-            .status-grid { grid-column: 1 / 2; }
-            .log-container { grid-column: 1 / 2; height: 300px; }
-            .view-hidden { display: none !important; }
-        }
+        /* Налаштування */
+        .settings-row { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+        .settings-input { background: var(--bg-main); color: #fff; border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; outline: none; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -201,10 +180,6 @@
             <div class="nav-item active" data-target="view-dashboard"><i class="fas fa-satellite-dish"></i> Live Monitoring</div>
             <div class="nav-item" data-target="view-analytics"><i class="fas fa-chart-bar"></i> Analytics</div>
             <div class="nav-item" data-target="view-settings"><i class="fas fa-cog"></i> Settings</div>
-        </div>
-        <div class="sys-health">
-            <div class="health-row"><span>CPU</span><span>12%</span></div>
-            <div class="health-row"><span>Net</span><span style="color:var(--online)">24ms</span></div>
         </div>
     </aside>
 
@@ -224,19 +199,18 @@
             <div class="glass map-container">
                 <div class="map-scaler">
                     <svg id="map-svg" viewBox="0 0 600 450" style="position: absolute; width: 100%; height: 100%; z-index: 2; overflow: visible;">
-                        
                         <image href="map_of_apartment.svg" x="-600" y="-200" width="1700" height="950" preserveAspectRatio="none" opacity="0.8" style="transform-origin: center; transform: rotate(90deg);"></image>
                         
-                        <rect id="zone_my_bedroom" class="zone active-red" x="55" y="167" width="127" height="145" rx="2"></rect>
-                        <rect id="zone_guest_bedroom" class="zone" x="135" y="60" width="98" height="105" rx="2"></rect>
-                        <rect id="zone_balcony_1" class="zone" x="135" y="20" width="100" height="40" rx="2"></rect>
-                        <rect id="zone_main_corridor" class="zone" x="182" y="168" width="210" height="40" rx="2"></rect>
-                        <rect id="zone_bathroom" class="zone" x="220" y="210" width="70" height="105" rx="2"></rect>
-                        <rect id="zone_toilet" class="zone" x="295" y="210" width="40" height="105" rx="2"></rect>
-                        <rect id="zone_pantry" class="zone" x="186" y="210" width="35" height="105" rx="2"></rect>
-                        <rect id="zone_living_room" class="zone" x="235" y="20" width="155" height="145" rx="2"></rect>
-                        <rect id="zone_kitchen" class="zone" x="403" y="35" width="95" height="130" rx="2"></rect>
-                        <rect id="zone_balcony_2" class="zone" x="403" y="-5" width="95" height="40" rx="2"></rect>
+                        <rect id="zone_my_bedroom" class="zone" x="350" y="50" width="80" height="100" rx="2"></rect>
+                        <rect id="zone_guest_bedroom" class="zone" x="280" y="50" width="60" height="80" rx="2"></rect>
+                        <rect id="zone_balcony_1" class="zone" x="250" y="50" width="25" height="80" rx="2"></rect>
+                        <rect id="zone_main_corridor" class="zone" x="280" y="140" width="150" height="40" rx="2"></rect>
+                        <rect id="zone_bathroom" class="zone" x="350" y="190" width="80" height="60" rx="2"></rect>
+                        <rect id="zone_toilet" class="zone" x="350" y="260" width="80" height="30" rx="2"></rect>
+                        <rect id="zone_pantry" class="zone" x="350" y="300" width="80" height="30" rx="2"></rect>
+                        <rect id="zone_living_room" class="zone" x="100" y="140" width="170" height="150" rx="2"></rect>
+                        <rect id="zone_kitchen" class="zone" x="100" y="300" width="170" height="80" rx="2"></rect>
+                        <rect id="zone_balcony_2" class="zone" x="70" y="300" width="25" height="80" rx="2"></rect>
 
                         <defs>
                             <radialGradient id="radarGlow" cx="50%" cy="100%" r="100%">
@@ -263,6 +237,14 @@
                     <input type="range" id="map-zoom-slider" min="0.2" max="3.0" step="0.1" value="0.6">
                     <i class="fas fa-search-plus"></i>
                 </div>
+            </div>
+
+            <div class="camera-window">
+                <div id="camera-placeholder" class="camera-overlay">
+                    <i class="fas fa-eye-slash"></i>
+                    <div class="camera-label">Режим очікування</div>
+                </div>
+                <img id="camera-feed" src="" alt="Live Stream" style="opacity: 0;">
             </div>
 
             <div class="status-grid">
@@ -297,29 +279,40 @@
 
         <div id="view-settings" class="dashboard" style="display: none;">
             <div class="glass log-container" style="grid-column: 1 / -1; padding: 30px; height: auto; overflow: visible;">
-                <div class="log-header"><i class="fas fa-cog"></i> System Configuration</div>
+                <div class="log-header" style="font-size: 16px;"><i class="fas fa-cog"></i> System Configuration</div>
                 
-                <div style="display: grid; grid-template-columns: 1fr; gap: 24px; margin-top: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                <div style="margin-top: 20px;">
+                    <div class="settings-row">
                         <div>
                             <div style="font-weight: 600; font-size: 15px;">System Armed</div>
-                            <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Enable or disable LD2450 radar detection</div>
+                            <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Увімкнути/вимкнути радар LD2450</div>
                         </div>
                         <input id="ui-armed" type="checkbox" checked onchange="sendSettings()" style="width: 20px; height: 20px; cursor: pointer;">
                     </div>
 
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
-                        <div style="flex-grow: 1; padding-right: 40px;">
-                            <div style="font-weight: 600; font-size: 15px;">Radar Noise Filter (Distance)</div>
-                            <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Ignore movements closer than <span id="ui-sens-val" style="color: var(--text-main); font-weight: bold;">30</span> cm</div>
-                            <input id="ui-sens" type="range" min="0" max="100" value="30" onchange="sendSettings()" oninput="document.getElementById('ui-sens-val').innerText = this.value" style="width: 100%; margin-top: 15px; cursor: pointer;">
+                    <div class="settings-row">
+                        <div>
+                            <div style="font-weight: 600; font-size: 15px;">Режим роботи камери</div>
+                            <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Увімкнення по руху для економії трафіку</div>
                         </div>
+                        <select id="sett-cam-mode" onchange="saveCameraSettings()" class="settings-input">
+                            <option value="on_motion">Тільки при русі (Сон)</option>
+                            <option value="always_on">Завжди увімкнена</option>
+                        </select>
+                    </div>
+
+                    <div class="settings-row">
+                        <div>
+                            <div style="font-weight: 600; font-size: 15px;">IP-адреса ESP32-CAM</div>
+                            <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Локальна адреса потоку у вашій мережі</div>
+                        </div>
+                        <input type="text" id="sett-cam-ip" placeholder="напр. 192.168.1.50" onchange="saveCameraSettings()" class="settings-input">
                     </div>
 
                     <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px;">
                         <div>
                             <div style="font-weight: 600; font-size: 15px;">Restart Hardware</div>
-                            <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Remote reboot of the ESP32-C3 module</div>
+                            <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Віддалене перезавантаження ESP32-C3</div>
                         </div>
                         <button onclick="sendReboot()" style="background: var(--alert); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s;">
                         Reboot ESP32
@@ -330,17 +323,17 @@
         </div>
     </div>
 
-<script>
+    <script>
         const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
         let socket; 
         
-        // --- ПЕРЕМЕННЫЕ ДАТЧИКА ---
+        // --- ЗМІННІ ДАТЧИКА ---
         let currX = parseFloat(localStorage.getItem('sensorX')) || 450;
         let currY = parseFloat(localStorage.getItem('sensorY')) || 350;
         let currA = parseFloat(localStorage.getItem('sensorA')) || -135;
         let isDraggingSensor = false;
 
-        // --- ПЕРЕМЕННЫЕ КАРТЫ (Зум и Панорамирование) ---
+        // --- ЗМІННІ КАРТИ (Зум і Панорамування) ---
         const mapZoomSlider = document.getElementById('map-zoom-slider');
         const mapScalerObj = document.querySelector('.map-scaler');
         const mapContainer = document.querySelector('.map-container');
@@ -352,7 +345,22 @@
         let startPanX = 0;
         let startPanY = 0;
 
-        // Функция применения трансформации к карте
+        // --- ЗМІННІ КАМЕРИ ---
+        let camMode = localStorage.getItem('camMode') || 'on_motion';
+        let camIP = localStorage.getItem('camIP') || '';
+        let cameraSleepTimeout;
+
+        document.getElementById('sett-cam-mode').value = camMode;
+        document.getElementById('sett-cam-ip').value = camIP;
+
+        function saveCameraSettings() {
+            camMode = document.getElementById('sett-cam-mode').value;
+            camIP = document.getElementById('sett-cam-ip').value;
+            localStorage.setItem('camMode', camMode);
+            localStorage.setItem('camIP', camIP);
+            handleCameraView(false); // Оновлюємо стан миттєво
+        }
+
         function updateMapTransform() {
             mapScalerObj.style.transform = `translate(${mapOffsetX}px, ${mapOffsetY}px) scale(${currentMapZoom})`;
             localStorage.setItem('mapScaleLevel', currentMapZoom);
@@ -360,13 +368,50 @@
             localStorage.setItem('mapOffsetY', mapOffsetY);
         }
         
-        // Применяем при старте
         mapZoomSlider.value = currentMapZoom;
         updateMapTransform();
         mapContainer.style.cursor = 'grab';
 
         // ==========================================
-        // ЛОГИКА СОКЕТОВ И РАДАРА
+        // ЛОГІКА КАМЕРИ
+        // ==========================================
+        function handleCameraView(isMovementDetected) {
+            const feed = document.getElementById('camera-feed');
+            const placeholder = document.getElementById('camera-placeholder');
+            
+            // Якщо IP ще не введено, просто показуємо заставку
+            if (!camIP) return; 
+
+            const streamUrl = `http://${camIP}:81/stream`;
+
+            if (camMode === 'always_on') {
+                if (feed.src !== streamUrl) feed.src = streamUrl;
+                feed.style.opacity = "1";
+                placeholder.style.opacity = "0";
+                return;
+            }
+
+            // Режим "Тільки при русі"
+            if (isMovementDetected) {
+                clearTimeout(cameraSleepTimeout); 
+                if (feed.style.opacity === "0" || feed.style.opacity === "") {
+                    feed.src = streamUrl; 
+                    feed.style.opacity = "1";
+                    placeholder.style.opacity = "0";
+                }
+            } else {
+                // Відключаємо через 10 секунд без руху
+                clearTimeout(cameraSleepTimeout);
+                cameraSleepTimeout = setTimeout(() => {
+                    feed.style.opacity = "0";
+                    placeholder.style.opacity = "1";
+                    feed.src = ""; // Відключаємо потік, щоб не грузити мережу
+                }, 10000); 
+            }
+        }
+
+        // ==========================================
+        // ЛОГІКА СОКЕТІВ ТА РАДАРА
         // ==========================================
         function connectWebSocket() {
             socket = new WebSocket(protocol + window.location.host);
@@ -394,6 +439,9 @@
                 }
 
                 if (data.movement) {
+                    // Передаємо сигнал про рух в логіку камери
+                    handleCameraView(true);
+
                     if (isDraggingSensor) {
                         const dot = document.getElementById('tracking-dot');
                         if (dot) dot.style.opacity = '0';
@@ -431,6 +479,9 @@
                         addLog(`Entered: ${niceZoneName}`, 'warning');
                         lastLoggedZone = data.zone;
                     }
+                } else {
+                    // Якщо руху немає, повідомляємо камеру
+                    handleCameraView(false);
                 }
             };
 
@@ -448,17 +499,15 @@
 
         function sendSettings() {
             const isArmed = document.getElementById('ui-armed').checked;
-            const sensValue = parseInt(document.getElementById('ui-sens').value);
-            const payload = { type: 'settings_update', armed: isArmed, sensitivity: sensValue };
-            
+            const payload = { type: 'settings_update', armed: isArmed };
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify(payload));
-                addLog(`Settings updated: Filter ${sensValue}cm`, 'info');
+                addLog(`System Armed: ${isArmed}`, 'info');
             }
         }
 
         function sendReboot() {
-            if(confirm("Вы уверены, что хотите перезагрузить ESP32?")) {
+            if(confirm("Ви впевнені, що хочете перезавантажити ESP32?")) {
                 if (socket && socket.readyState === WebSocket.OPEN) {
                     socket.send(JSON.stringify({ type: 'settings_update', reboot: true }));
                     addLog('Reboot command sent to hardware', 'alert');
@@ -491,7 +540,7 @@
         setInterval(() => document.getElementById('live-clock').innerText = new Date().toLocaleTimeString(), 1000);
 
         // ==========================================
-        // ИНТЕРАКТИВ (Датчик и Карта)
+        // ІНТЕРАКТИВ (Датчик і Карта)
         // ==========================================
         const mapSvg = document.getElementById('map-svg');
         const sensor = document.getElementById('sensor_module');
@@ -503,24 +552,22 @@
             return { x: (e.clientX - ctm.e) / ctm.a, y: (e.clientY - ctm.f) / ctm.d };
         }
 
-        // --- ЛОГИКА ДАТЧИКА ---
         sensor.addEventListener('mousedown', (e) => { 
-            e.stopPropagation(); // Блокируем движение карты
+            e.stopPropagation(); 
             isDraggingSensor = true; 
             sensor.style.cursor = 'grabbing'; 
         });
         
         sensor.addEventListener('wheel', (e) => {
-            e.stopPropagation(); // Блокируем зум карты
+            e.stopPropagation(); 
             e.preventDefault();
             currA += e.deltaY > 0 ? 5 : -5;
             sensor.setAttribute('transform', `translate(${currX}, ${currY}) rotate(${currA})`);
             localStorage.setItem('sensorA', currA);
         });
 
-        // --- ЛОГИКА КАРТЫ (Pan & Zoom) ---
         mapContainer.addEventListener('mousedown', (e) => {
-            if (e.button !== 0) return; // Только левая кнопка
+            if (e.button !== 0) return; 
             isPanningMap = true;
             startPanX = e.clientX - mapOffsetX;
             startPanY = e.clientY - mapOffsetY;
@@ -528,7 +575,6 @@
         });
 
         window.addEventListener('mousemove', (e) => {
-            // Двигаем датчик
             if (isDraggingSensor) {
                 const c = getCoords(e); 
                 currX = c.x; currY = c.y;
@@ -536,7 +582,6 @@
                 localStorage.setItem('sensorX', currX);
                 localStorage.setItem('sensorY', currY);
             }
-            // Двигаем карту
             if (isPanningMap) {
                 mapOffsetX = e.clientX - startPanX;
                 mapOffsetY = e.clientY - startPanY;
@@ -551,13 +596,11 @@
             mapContainer.style.cursor = 'grab';
         });
 
-        // Зум через ползунок
         mapZoomSlider.addEventListener('input', (e) => {
             currentMapZoom = parseFloat(e.target.value);
             updateMapTransform();
         });
 
-        // Зум через колесико мыши
         mapContainer.addEventListener('wheel', (e) => {
             e.preventDefault();
             const zoomStep = 0.05;
@@ -566,13 +609,11 @@
             } else {
                 currentMapZoom = Math.max(0.2, currentMapZoom - zoomStep);
             }
-            mapZoomSlider.value = currentMapZoom; // Синхронизируем ползунок
+            mapZoomSlider.value = currentMapZoom; 
             updateMapTransform();
         });
 
-        // ==========================================
-        // ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ И АНАЛИТИКА
-        // ==========================================
+        // ПЕРЕКЛЮЧЕННЯ ЕКРАНІВ ТА АНАЛІТИКА
         const navItems = document.querySelectorAll('.nav-item');
         const views = ['view-dashboard', 'view-analytics', 'view-settings'];
 
@@ -597,9 +638,9 @@
         const analyticsChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels: ['Моя спальня', 'Зал', 'Кухня', 'Ванная', 'Коридор'],
+                labels: ['Моя спальня', 'Зал', 'Кухня', 'Ванна', 'Коридор'],
                 datasets: [{
-                    label: 'Активность (%)',
+                    label: 'Активність (%)',
                     data: [45, 25, 15, 5, 10],
                     backgroundColor: [
                         'rgba(59, 130, 246, 0.8)', 'rgba(139, 92, 246, 0.8)',
@@ -613,7 +654,7 @@
                 responsive: true, maintainAspectRatio: false,
                 plugins: {
                     legend: { position: window.innerWidth <= 768 ? 'bottom' : 'right', labels: { padding: 20, font: { size: 13 } } },
-                    tooltip: { callbacks: { label: function(context) { return ' ' + context.label + ': ' + context.raw + '% времени'; } } }
+                    tooltip: { callbacks: { label: function(context) { return ' ' + context.label + ': ' + context.raw + '% часу'; } } }
                 }
             }
         });
