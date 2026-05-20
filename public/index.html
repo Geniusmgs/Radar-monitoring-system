@@ -330,16 +330,44 @@
         </div>
     </div>
 
-    <script>
+<script>
         const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
         let socket; 
         
-        // ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ПОЛОЖЕНИЯ ДАТЧИКА (С ПАМЯТЬЮ)
+        // --- ПЕРЕМЕННЫЕ ДАТЧИКА ---
         let currX = parseFloat(localStorage.getItem('sensorX')) || 450;
         let currY = parseFloat(localStorage.getItem('sensorY')) || 350;
         let currA = parseFloat(localStorage.getItem('sensorA')) || -135;
-        let isDragging = false;
+        let isDraggingSensor = false;
 
+        // --- ПЕРЕМЕННЫЕ КАРТЫ (Зум и Панорамирование) ---
+        const mapZoomSlider = document.getElementById('map-zoom-slider');
+        const mapScalerObj = document.querySelector('.map-scaler');
+        const mapContainer = document.querySelector('.map-container');
+        
+        let currentMapZoom = parseFloat(localStorage.getItem('mapScaleLevel')) || 0.6;
+        let mapOffsetX = parseFloat(localStorage.getItem('mapOffsetX')) || 0;
+        let mapOffsetY = parseFloat(localStorage.getItem('mapOffsetY')) || 0;
+        let isPanningMap = false;
+        let startPanX = 0;
+        let startPanY = 0;
+
+        // Функция применения трансформации к карте
+        function updateMapTransform() {
+            mapScalerObj.style.transform = `translate(${mapOffsetX}px, ${mapOffsetY}px) scale(${currentMapZoom})`;
+            localStorage.setItem('mapScaleLevel', currentMapZoom);
+            localStorage.setItem('mapOffsetX', mapOffsetX);
+            localStorage.setItem('mapOffsetY', mapOffsetY);
+        }
+        
+        // Применяем при старте
+        mapZoomSlider.value = currentMapZoom;
+        updateMapTransform();
+        mapContainer.style.cursor = 'grab';
+
+        // ==========================================
+        // ЛОГИКА СОКЕТОВ И РАДАРА
+        // ==========================================
         function connectWebSocket() {
             socket = new WebSocket(protocol + window.location.host);
             let lastLoggedZone = null; 
@@ -349,7 +377,6 @@
                 const sensorModule = document.getElementById('sensor_module');
                 const radarPulse = document.getElementById('radar-pulse');
 
-                // 1. ОБРАБОТКА СТАТУСА
                 if (data.type === 'status') {
                     const statusVal = document.getElementById('ui-sensor-status');
                     if (data.status === 'online') {
@@ -366,10 +393,8 @@
                     return;
                 }
 
-                // 2. ОБРАБОТКА ДВИЖЕНИЯ
                 if (data.movement) {
-                    // UX фикс: Если мы сейчас тащим радар мышкой, временно прячем точку и не считаем шаги
-                    if (isDragging) {
+                    if (isDraggingSensor) {
                         const dot = document.getElementById('tracking-dot');
                         if (dot) dot.style.opacity = '0';
                         return;
@@ -382,7 +407,6 @@
                     const activeRect = document.getElementById('zone_' + data.zone);
                     if (activeRect) activeRect.classList.add('active-red');
 
-                    // ВЕКТОРНЫЙ РАСЧЕТ ОТНОСИТЕЛЬНО ТЕКУЩЕГО МЕСТА ДАТЧИКА
                     const dot = document.getElementById('tracking-dot');
                     if (dot && data.rawX !== undefined && data.rawY !== undefined) {
                         const SENSOR_X = currX; 
@@ -402,7 +426,6 @@
                         dot.setAttribute('cy', finalY);
                     }
 
-                    // АНТИ-СПАМ ЛОГОВ (Пишем только при переходе в новую комнату)
                     if (data.zone !== lastLoggedZone) {
                         const niceZoneName = zoneNames[data.zone] || data.zone;
                         addLog(`Entered: ${niceZoneName}`, 'warning');
@@ -462,56 +485,94 @@
             item.className = `log-item ${type}`;
             item.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString()}</span><span>${msg}</span>`;
             list.prepend(item);
-
-            if (list.children.length > 50) {
-                list.removeChild(list.lastChild);
-            }
+            if (list.children.length > 50) list.removeChild(list.lastChild);
         }
 
-        // Clock
         setInterval(() => document.getElementById('live-clock').innerText = new Date().toLocaleTimeString(), 1000);
 
-        // Drag & Rotate Logic
+        // ==========================================
+        // ИНТЕРАКТИВ (Датчик и Карта)
+        // ==========================================
         const mapSvg = document.getElementById('map-svg');
         const sensor = document.getElementById('sensor_module');
         
-        if(sensor) {
-            sensor.setAttribute('transform', `translate(${currX}, ${currY}) rotate(${currA})`);
-        }
+        if(sensor) sensor.setAttribute('transform', `translate(${currX}, ${currY}) rotate(${currA})`);
 
         function getCoords(e) {
             const ctm = mapSvg.getScreenCTM();
             return { x: (e.clientX - ctm.e) / ctm.a, y: (e.clientY - ctm.f) / ctm.d };
         }
 
-        function saveSensorPosition() {
-            localStorage.setItem('sensorX', currX);
-            localStorage.setItem('sensorY', currY);
-            localStorage.setItem('sensorA', currA);
-        }
-
-        sensor.addEventListener('mousedown', () => { isDragging = true; sensor.style.cursor = 'grabbing'; });
-        
-        mapSvg.addEventListener('mousemove', (e) => {
-            if (isDragging) {
-                const c = getCoords(e); 
-                currX = c.x; 
-                currY = c.y;
-                sensor.setAttribute('transform', `translate(${currX}, ${currY}) rotate(${currA})`);
-                saveSensorPosition(); 
-            }
+        // --- ЛОГИКА ДАТЧИКА ---
+        sensor.addEventListener('mousedown', (e) => { 
+            e.stopPropagation(); // Блокируем движение карты
+            isDraggingSensor = true; 
+            sensor.style.cursor = 'grabbing'; 
         });
         
-        window.addEventListener('mouseup', () => { isDragging = false; sensor.style.cursor = 'grab'; });
-        
         sensor.addEventListener('wheel', (e) => {
+            e.stopPropagation(); // Блокируем зум карты
             e.preventDefault();
             currA += e.deltaY > 0 ? 5 : -5;
             sensor.setAttribute('transform', `translate(${currX}, ${currY}) rotate(${currA})`);
-            saveSensorPosition(); 
+            localStorage.setItem('sensorA', currA);
         });
 
-        // ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ
+        // --- ЛОГИКА КАРТЫ (Pan & Zoom) ---
+        mapContainer.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return; // Только левая кнопка
+            isPanningMap = true;
+            startPanX = e.clientX - mapOffsetX;
+            startPanY = e.clientY - mapOffsetY;
+            mapContainer.style.cursor = 'grabbing';
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            // Двигаем датчик
+            if (isDraggingSensor) {
+                const c = getCoords(e); 
+                currX = c.x; currY = c.y;
+                sensor.setAttribute('transform', `translate(${currX}, ${currY}) rotate(${currA})`);
+                localStorage.setItem('sensorX', currX);
+                localStorage.setItem('sensorY', currY);
+            }
+            // Двигаем карту
+            if (isPanningMap) {
+                mapOffsetX = e.clientX - startPanX;
+                mapOffsetY = e.clientY - startPanY;
+                updateMapTransform();
+            }
+        });
+        
+        window.addEventListener('mouseup', () => { 
+            isDraggingSensor = false; 
+            isPanningMap = false;
+            sensor.style.cursor = 'grab';
+            mapContainer.style.cursor = 'grab';
+        });
+
+        // Зум через ползунок
+        mapZoomSlider.addEventListener('input', (e) => {
+            currentMapZoom = parseFloat(e.target.value);
+            updateMapTransform();
+        });
+
+        // Зум через колесико мыши
+        mapContainer.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomStep = 0.05;
+            if (e.deltaY < 0) {
+                currentMapZoom = Math.min(3.0, currentMapZoom + zoomStep);
+            } else {
+                currentMapZoom = Math.max(0.2, currentMapZoom - zoomStep);
+            }
+            mapZoomSlider.value = currentMapZoom; // Синхронизируем ползунок
+            updateMapTransform();
+        });
+
+        // ==========================================
+        // ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ И АНАЛИТИКА
+        // ==========================================
         const navItems = document.querySelectorAll('.nav-item');
         const views = ['view-dashboard', 'view-analytics', 'view-settings'];
 
@@ -519,7 +580,6 @@
             item.addEventListener('click', function() {
                 const targetId = this.getAttribute('data-target');
                 const targetView = document.getElementById(targetId);
-
                 if (!targetView) return;
 
                 navItems.forEach(nav => nav.classList.remove('active'));
@@ -530,7 +590,6 @@
             });
         });
 
-        // АНАЛИТИКА (Chart.js)
         Chart.defaults.color = '#9fb0d0'; 
         Chart.defaults.font.family = "'Inter', sans-serif";
 
@@ -543,47 +602,20 @@
                     label: 'Активность (%)',
                     data: [45, 25, 15, 5, 10],
                     backgroundColor: [
-                        'rgba(59, 130, 246, 0.8)',
-                        'rgba(139, 92, 246, 0.8)',
-                        'rgba(16, 185, 129, 0.8)',
-                        'rgba(245, 158, 11, 0.8)',
+                        'rgba(59, 130, 246, 0.8)', 'rgba(139, 92, 246, 0.8)',
+                        'rgba(16, 185, 129, 0.8)', 'rgba(245, 158, 11, 0.8)',
                         'rgba(239, 68, 68, 0.8)'
                     ],
-                    borderColor: '#111a2e',
-                    borderWidth: 3,
-                    hoverOffset: 10
+                    borderColor: '#111a2e', borderWidth: 3, hoverOffset: 10
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
+                responsive: true, maintainAspectRatio: false,
                 plugins: {
-                    legend: {
-                        position: window.innerWidth <= 768 ? 'bottom' : 'right',
-                        labels: { padding: 20, font: { size: 13 } }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) { return ' ' + context.label + ': ' + context.raw + '% времени'; }
-                        }
-                    }
+                    legend: { position: window.innerWidth <= 768 ? 'bottom' : 'right', labels: { padding: 20, font: { size: 13 } } },
+                    tooltip: { callbacks: { label: function(context) { return ' ' + context.label + ': ' + context.raw + '% времени'; } } }
                 }
             }
-        });
-
-        // --- ЛОГИКА ЗУМА КАРТЫ (С памятью) ---
-        const mapZoomSlider = document.getElementById('map-zoom-slider');
-        const mapScalerObj = document.querySelector('.map-scaler');
-
-        let currentMapZoom = parseFloat(localStorage.getItem('mapScaleLevel')) || 0.6;
-        
-        mapZoomSlider.value = currentMapZoom;
-        mapScalerObj.style.transform = `scale(${currentMapZoom})`;
-
-        mapZoomSlider.addEventListener('input', (e) => {
-            currentMapZoom = e.target.value;
-            mapScalerObj.style.transform = `scale(${currentMapZoom})`;
-            localStorage.setItem('mapScaleLevel', currentMapZoom);
         });
     </script>
 </body>
