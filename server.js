@@ -2,105 +2,137 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
+const TelegramBot = require('node-telegram-bot-api'); // <-- ПІДКЛЮЧАЄМО TELEGRAM
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Глобальное состояние настроек системы
+// ==========================================
+// 🔴 НАЛАШТУВАННЯ TELEGRAM (Встав свої дані)
+// ==========================================
+const TELEGRAM_TOKEN = 'ТВІЙ_ТОКЕН_ВІД_BOTFATHER'; 
+const CHAT_ID = 'ТВІЙ_CHAT_ID';
+
+// Створюємо бота. polling: false, тому що ми тільки відправляємо повідомлення
+const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: false }); 
+
+// ==========================================
+
+// Глобальний стан налаштувань системи
 let deviceSettings = {
-    armed: true,         // Включен ли радар
-    sensitivity: 300,    // Фильтр дистанции в миллиметрах
-    reboot: false        // Флаг перезагрузки
+    armed: true,         // Чи увімкнений радар
+    sensitivity: 300,    // Фільтр дистанції в міліметрах
+    reboot: false        // Прапорець перезавантаження
 }; 
 
-// Константы для контроля статуса
+// Константи для контролю статусу
 let lastPingTime = 0;
 let isSensorOnline = false;
 const ESP_SECRET_TOKEN = "RadarView-ESP32-C3-SecretKey-2026";
 
-// Настройка статики: теперь сервер корректно найдет файлы и в корне, и в /public
+// Змінні для анти-спаму Телеграм
+let lastReportedZone = null;
+let clearZoneTimeout = null;
+
+// Налаштування статики: тепер сервер коректно знайде файли і в корені, і в /public
 app.use(express.static(__dirname));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// Главная страница
+// Головна сторінка
 app.get('/', (req, res) => {
-    // Безопасный способ отправки файла без дублирования заголовков
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Таймер проверки связи (раз в секунду)
+// Таймер перевірки зв'язку (раз на секунду)
 setInterval(() => {
     const now = Date.now();
     if (isSensorOnline && (now - lastPingTime > 15000)) {
         isSensorOnline = false;
-        console.log('❌ Связь с ESP32 потеряна!');
-        
+        console.log('❌ Зв\'язок з ESP32 втрачено!');
         broadcast({ type: 'status', status: 'offline' });
+        
+        // Опціонально: повідомлення про відключення радара
+        // bot.sendMessage(CHAT_ID, '⚠️ Увага: Радар відключився від мережі!').catch(console.error);
     }
 }, 1000);
 
-// API для получения данных от ESP32
+// API для отримання даних від ESP32
 app.post('/api/data', (req, res) => {
     const data = req.body;
     
-    // 1. Проверка токена
+    // 1. Перевірка токена
     if (data.token !== ESP_SECRET_TOKEN) {
-        console.log('⚠️ Попытка доступа с неверным токеном!');
         return res.status(403).json({ error: 'Unauthorized' });
     }
     
-    // 2. Обновление статуса онлайн
+    // 2. Оновлення статусу онлайн
     lastPingTime = Date.now();
     if (!isSensorOnline) {
         isSensorOnline = true;
-        console.log('✅ ESP32 снова в сети!');
+        console.log('✅ ESP32 знову в мережі!');
         broadcast({ type: 'status', status: 'online' });
     }
 
-    // 3. Логирование координат (нужно для калибровки твоих 10 зон)
-    // Теперь ты будешь видеть в логах Render, куда именно ты наступил
-// 3. Логирование координат (нужно для калибровки твоих 10 зон)
-    console.log(`📍 Координаты: X=${data.rawX}, Y=${data.rawY} | Зона: ${data.zone}`);
+    // 3. Логування координат (потрібно для калібрування зон)
+    console.log(`📍 Координати: X=${data.x}, Y=${data.y} | Зона: ${data.zone}`);
     
-    // 4. Рассылка данных всем подключенным браузерам
+    // ==========================================
+    // ЛОГІКА ПОВІДОМЛЕНЬ TELEGRAM
+    // ==========================================
+    // Якщо система під охороною (armed) і є рух
+    if (deviceSettings.armed && data.movement) {
+        // Якщо людина перейшла в НОВУ зону (або щойно з'явилася)
+        if (data.zone !== lastReportedZone) {
+            
+            // Відправляємо повідомлення в ТГ
+            const msg = `🚨 Виявлено рух!\n📍 Зона: ${data.zone}\n⏱ Час: ${new Date().toLocaleTimeString('uk-UA')}`;
+            bot.sendMessage(CHAT_ID, msg).catch(err => console.error("Помилка Telegram:", err.message));
+            
+            lastReportedZone = data.zone; // Запам'ятовуємо, де зараз людина
+        }
+
+        // Скидаємо таймер "тиші" при кожному русі
+        clearTimeout(clearZoneTimeout);
+        
+        // Якщо 10 секунд немає руху — забуваємо зону. 
+        // При наступному русі бот знову надішле сповіщення.
+        clearZoneTimeout = setTimeout(() => {
+            lastReportedZone = null;
+            console.log('Тиша. Зону очищено.');
+        }, 10000);
+    }
+    // ==========================================
+
+    // 4. Розсилка даних усім підключеним браузерам
     broadcast(data);
     
-    // 5. Ответ плате с актуальными настройками
+    // 5. Відповідь платі з актуальними налаштуваннями
     res.json(deviceSettings);
 
-    // Сброс флага перезагрузки после отправки подтверждения
+    // Скидання прапорця перезавантаження після відправки підтвердження
     if (deviceSettings.reboot) {
-        console.log("🚀 Команда на перезагрузку успешно передана устройству.");
         deviceSettings.reboot = false; 
     }
 });
 
-// WebSocket логика
+// WebSocket логіка
 wss.on('connection', (ws) => {
-    console.log('🌐 Новый клиент подключился к панели управления');
-
     ws.on('message', (message) => {
         try {
             const msg = JSON.parse(message);
             if (msg.type === 'settings_update') {
                 if (msg.armed !== undefined) deviceSettings.armed = msg.armed;
-                // Конвертируем СМ в ММ для датчика
+                // Конвертуємо СМ у ММ для датчика
                 if (msg.sensitivity !== undefined) deviceSettings.sensitivity = msg.sensitivity * 10;
                 if (msg.reboot !== undefined) deviceSettings.reboot = msg.reboot;
-                
-                console.log('⚙️ Настройки обновлены:', deviceSettings);
             }
-        } catch (e) {
-            console.error("Ошибка парсинга настроек:", e);
-        }
+        } catch (e) {}
     });
-
-    ws.on('close', () => console.log('🔌 Клиент отключился'));
 });
 
-// Функция для массовой рассылки сообщений через WebSocket
+// Функція для масової розсилки повідомлень через WebSocket
 function broadcast(payload) {
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
@@ -111,5 +143,5 @@ function broadcast(payload) {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Сервер Pidkamennyi O.M. запущен на порту ${PORT}`);
+    console.log(`🚀 Сервер Pidkamennyi O.M. запущено на порту ${PORT}`);
 });
