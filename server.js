@@ -12,8 +12,8 @@ const wss = new WebSocket.Server({ server });
 // ==========================================
 // 🔴 НАЛАШТУВАННЯ СИСТЕМИ (Встав свої дані)
 // ==========================================
-const TELEGRAM_TOKEN = 'ТВІЙ_ТОКЕН_ВІД_BOTFATHER'; 
-const CHAT_ID = 'ТВІЙ_CHAT_ID';
+const TELEGRAM_TOKEN = '8925155619:AAEQXMrXe5XyhrnFbGW-vBhoy3f4d5X_R1U'; 
+const CHAT_ID = '1164801711';
 
 // Локальна IP-адреса твоєї ESP32-CAM (вкажи ту, яку видасть роутер)
 let cameraIP = '192.168.1.50'; 
