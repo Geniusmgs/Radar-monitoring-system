@@ -481,7 +481,21 @@
                     return;
                 }
 
-                if (data.movement) {
+                    if (data.movement) {
+                        handleCameraView(true);
+
+                        // ---: Інкремент даних аналітики для поточної зони ---
+                        if (data.zone && zoneActivityData[data.zone] !== undefined) {
+                            zoneActivityData[data.zone] += 1; // Додаємо одиницю активності
+                            refreshAnalyticsChart();          // Миттєво перемальовуємо діаграму Chart.js
+                        }
+                        // ---------------------------------------------------------
+
+                        if (isDraggingSensor) {
+                            const dot = document.getElementById('tracking-dot');
+                            if (dot) dot.style.opacity = '0';
+                            return;
+                        }
                     // Передаємо сигнал про рух в логіку камери
                     handleCameraView(true);
 
@@ -685,30 +699,84 @@
         Chart.defaults.color = '#9fb0d0'; 
         Chart.defaults.font.family = "'Inter', sans-serif";
 
-        const ctx = document.getElementById('analyticsChart').getContext('2d');
-        const analyticsChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Моя спальня', 'Зал', 'Кухня', 'Ванна', 'Коридор'],
-                datasets: [{
-                    label: 'Активність (%)',
-                    data: [45, 25, 15, 5, 10],
-                    backgroundColor: [
-                        'rgba(59, 130, 246, 0.8)', 'rgba(139, 92, 246, 0.8)',
-                        'rgba(16, 185, 129, 0.8)', 'rgba(245, 158, 11, 0.8)',
-                        'rgba(239, 68, 68, 0.8)'
-                    ],
-                    borderColor: '#111a2e', borderWidth: 3, hoverOffset: 10
-                }]
+// ==========================================
+// 📊 НОВОЕ: ДИНАМІЧНА АНАЛІТИКА ТА НАКОПИЧЕННЯ ДАНИХ
+// ==========================================
+
+// Об'єкт для зберігання кількості фіксацій руху по кожній із 10 реальних зон
+const zoneActivityData = {
+    'my_bedroom': 0,
+    'guest_bedroom': 0,
+    'balcony_1': 0,
+    'main_corridor': 0,
+    'bathroom': 0,
+    'toilet': 0,
+    'pantry': 0,
+    'living_room': 0,
+    'kitchen': 0,
+    'balcony_2': 0
+};
+
+Chart.defaults.color = '#9fb0d0'; 
+Chart.defaults.font.family = "'Inter', sans-serif";
+
+const ctx = document.getElementById('analyticsChart').getContext('2d');
+const analyticsChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+        // Усі 10 зон відповідно до вашої карти приміщення
+        labels: [
+            'My Bedroom', 'Guest Bedroom', 'Balcony #1', 'Main Corridor', 
+            'Bathroom', 'Toilet', 'Pantry', 'Living Room', 'Kitchen', 'Balcony #2'
+        ],
+        datasets: [{
+            label: 'Фіксація активності (пакетів)',
+            data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // Початкові нульові значення
+            // 10 професійних гармонійних кольорів під темну тему інтерфейсу
+            backgroundColor: [
+                '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444',
+                '#ec4899', '#06b6d4', '#f43f5e', '#14b8a6', '#6366f1'
+            ],
+            borderColor: '#111a2e', 
+            borderWidth: 3, 
+            hoverOffset: 10
+        }]
+    },
+    options: {
+        responsive: true, 
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { 
+                position: window.innerWidth <= 768 ? 'bottom' : 'right', 
+                labels: { padding: 15, font: { size: 12 } } 
             },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: window.innerWidth <= 768 ? 'bottom' : 'right', labels: { padding: 20, font: { size: 13 } } },
-                    tooltip: { callbacks: { label: function(context) { return ' ' + context.label + ': ' + context.raw + '% часу'; } } }
-                }
+            tooltip: { 
+                callbacks: { 
+                    label: function(context) { 
+                        return ' ' + context.label + ': ' + context.raw + ' подій'; 
+                    } 
+                } 
             }
-        });
+        }
+    }
+});
+
+// Функція оновлення графіку при отриманні нових пакетів телеметрії
+function refreshAnalyticsChart() {
+    analyticsChart.data.datasets[0].data = [
+        zoneActivityData['my_bedroom'],
+        zoneActivityData['guest_bedroom'],
+        zoneActivityData['balcony_1'],
+        zoneActivityData['main_corridor'],
+        zoneActivityData['bathroom'],
+        zoneActivityData['toilet'],
+        zoneActivityData['pantry'],
+        zoneActivityData['living_room'],
+        zoneActivityData['kitchen'],
+        zoneActivityData['balcony_2']
+    ];
+    analyticsChart.update();
+}
     </script>
 </body>
 </html>
