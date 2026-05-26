@@ -418,11 +418,12 @@
         // ==========================================
         // ЛОГІКА КАМЕРИ
         // ==========================================
+        let isSleepTimerRunning = false; // Прапорець, щоб не обнуляти таймер постійно
+
         function handleCameraView(isMovementDetected) {
             const feed = document.getElementById('camera-feed');
             const placeholder = document.getElementById('camera-placeholder');
             
-            // Якщо IP ще не введено, просто показуємо заставку
             if (!camIP) return; 
 
             const streamUrl = `http://${camIP}:81/stream`;
@@ -436,20 +437,28 @@
 
             // Режим "Тільки при русі"
             if (isMovementDetected) {
-                clearTimeout(cameraSleepTimeout); 
+                // Якщо зафіксовано рух — жорстко скасовуємо таймер вимкнення
+                clearTimeout(cameraSleepTimeout);
+                isSleepTimerRunning = false; 
+
+                // Вмикаємо відеопотік, якщо він був вимкнений
                 if (feed.style.opacity === "0" || feed.style.opacity === "") {
                     feed.src = streamUrl; 
                     feed.style.opacity = "1";
                     placeholder.style.opacity = "0";
                 }
             } else {
-                // Відключаємо через 10 секунд без руху
-                clearTimeout(cameraSleepTimeout);
-                cameraSleepTimeout = setTimeout(() => {
-                    feed.style.opacity = "0";
-                    placeholder.style.opacity = "1";
-                    feed.src = ""; // Відключаємо потік, щоб не грузити мережу
-                }, 10000); 
+                // Якщо руху немає, камера працює, і таймер ЩЕ НЕ запущено
+                if (!isSleepTimerRunning && feed.style.opacity === "1") {
+                    isSleepTimerRunning = true; // Відмічаємо, що зворотний відлік пішов
+                    
+                    cameraSleepTimeout = setTimeout(() => {
+                        feed.style.opacity = "0";
+                        placeholder.style.opacity = "1";
+                        feed.src = ""; // Відключаємо потік, щоб не грузити мережу
+                        isSleepTimerRunning = false; // Скидаємо прапорець
+                    }, 10000); // 10 секунд тиші
+                }
             }
         }
 
