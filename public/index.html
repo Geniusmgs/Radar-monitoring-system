@@ -402,6 +402,9 @@
             localStorage.setItem('camMode', camMode);
             localStorage.setItem('camIP', camIP);
             handleCameraView(false); // Оновлюємо стан миттєво
+
+        if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: 'settings_update', cameraIP: camIP }));
         }
 
         function updateMapTransform() {
