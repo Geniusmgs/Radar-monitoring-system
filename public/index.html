@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Presence Monitoring System</title>
+    <title>Система розумного моніторингу присутності</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -199,21 +199,21 @@
     <aside class="sidebar">
         <div class="brand">RadarView UX</div>
         <div style="margin-top: 10px;">
-            <div class="nav-item active" data-target="view-dashboard"><i class="fas fa-satellite-dish"></i> Live Monitoring</div>
-            <div class="nav-item" data-target="view-analytics"><i class="fas fa-chart-bar"></i> Analytics</div>
-            <div class="nav-item" data-target="view-settings"><i class="fas fa-cog"></i> Settings</div>
+            <div class="nav-item active" data-target="view-dashboard"><i class="fas fa-satellite-dish"></i> Живий моніторинг</div>
+            <div class="nav-item" data-target="view-analytics"><i class="fas fa-chart-bar"></i> Аналітика</div>
+            <div class="nav-item" data-target="view-settings"><i class="fas fa-cog"></i> Налаштування</div>
         </div>
     </aside>
 
     <div class="main-wrapper">
         <header class="header">
             <div class="header-title">
-                Smart Presence Monitoring System
-                <div class="status-pill"><div class="pulse-dot"></div> ONLINE</div>
+                Система розумного моніторингу присутності
+                <div class="status-pill"><div class="pulse-dot"></div> ОНЛАЙН</div>
             </div>
             <div class="header-right">
                 <span id="live-clock" style="font-family: monospace; margin-right: 20px;">00:00:00</span>
-                <span>Pidkamennyi O.M. (Privilege 15)</span>
+                <span>Підкаменний О.М. (Привілей 15)</span>
             </div>
         </header>
 
@@ -271,28 +271,28 @@
 
             <div class="status-grid">
                 <div class="glass stat-card" style="grid-column: 1/3">
-                    <div class="stat-label">Active Zone</div>
-                    <div id="ui-active-zone" class="stat-val">Awaiting Data</div>
+                    <div class="stat-label">Активна зона</div>
+                    <div id="ui-active-zone" class="stat-val">Очікування даних</div>
                 </div>
                 <div class="glass stat-card">
-                    <div class="stat-label">Status</div>
-                    <div id="ui-sensor-status" class="stat-val">OFFLINE</div>
+                    <div class="stat-label">Статус</div>
+                    <div id="ui-sensor-status" class="stat-val">ОФЛАЙН</div>
                 </div>
                 <div class="glass stat-card">
-                    <div class="stat-label">Accuracy</div>
+                    <div class="stat-label">Точність</div>
                     <div class="stat-val">94.2%</div>
                 </div>
             </div>
 
             <div class="glass log-container">
-                <div class="log-header">System Event Log</div>
+                <div class="log-header">Журнал системних подій</div>
                 <div id="log-list" class="log-list"></div>
             </div>
         </main>
 
         <div id="view-analytics" class="dashboard" style="display: none;">
             <div class="glass log-container" style="grid-column: 1 / -1; padding: 20px;">
-                <div class="log-header"><i class="fas fa-chart-pie"></i> Zone Activity Distribution (Demo)</div>
+                <div class="log-header"><i class="fas fa-chart-pie"></i> Розподіл активності по зонах (Демо)</div>
                 <div style="position: relative; height: 400px; width: 100%; display: flex; justify-content: center; align-items: center; padding: 20px;">
                     <canvas id="analyticsChart"></canvas>
                 </div>
@@ -307,7 +307,7 @@
                     
                     <div class="settings-row">
                         <div>
-                            <div style="font-weight: 600; font-size: 15px;">System Armed</div>
+                            <div style="font-weight: 600; font-size: 15px;">Стан охорони</div>
                             <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Увімкнути/вимкнути радар LD2450</div>
                         </div>
                         <input id="ui-armed" type="checkbox" checked onchange="sendSettings()" style="width: 20px; height: 20px; cursor: pointer;">
@@ -353,11 +353,11 @@
                     
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
-                            <div style="font-weight: 600; font-size: 15px;">Restart Hardware</div>
+                            <div style="font-weight: 600; font-size: 15px;">Перезавантаження обладнання</div>
                             <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Віддалене перезавантаження ESP32-C3</div>
                         </div>
                         <button onclick="sendReboot()" style="background: var(--alert); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s;">
-                        Reboot ESP32
+                        Перезавантажити ESP32
                         </button>
                     </div>
                 </div>
@@ -402,6 +402,11 @@
             localStorage.setItem('camMode', camMode);
             localStorage.setItem('camIP', camIP);
             handleCameraView(false); // Оновлюємо стан миттєво
+            
+            // --- ВИПРАВЛЕННЯ: Відправляємо новий IP на сервер ---
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'settings_update', cameraIP: camIP }));
+            }
         }
 
         function updateMapTransform() {
@@ -477,15 +482,15 @@
                 if (data.type === 'status') {
                     const statusVal = document.getElementById('ui-sensor-status');
                     if (data.status === 'online') {
-                        statusVal.innerText = 'ONLINE'; statusVal.style.color = 'var(--online)';
+                        statusVal.innerText = 'ОНЛАЙН'; statusVal.style.color = 'var(--online)';
                         if(sensorModule) { sensorModule.style.opacity = '1'; sensorModule.style.filter = 'none'; }
                         if(radarPulse) radarPulse.style.display = 'block';
-                        addLog('Sensor established', 'info');
+                        addLog('Зв\'язок з сенсором встановлено', 'info');
                     } else {
-                        statusVal.innerText = 'OFFLINE'; statusVal.style.color = 'var(--alert)';
+                        statusVal.innerText = 'ОФЛАЙН'; statusVal.style.color = 'var(--alert)';
                         if(sensorModule) { sensorModule.style.opacity = '0.3'; sensorModule.style.filter = 'grayscale(1)'; }
                         if(radarPulse) radarPulse.style.display = 'none';
-                        addLog('Sensor lost', 'alert');
+                        addLog('Зв\'язок з сенсором втрачено', 'alert');
                     }
                     return;
                 }
@@ -534,7 +539,7 @@
 
                     if (data.zone !== lastLoggedZone) {
                         const niceZoneName = zoneNames[data.zone] || data.zone;
-                        addLog(`Entered: ${niceZoneName}`, 'warning');
+                        addLog(`Вхід у зону: ${niceZoneName}`, 'warning');
                         lastLoggedZone = data.zone;
                     }
                 } else {
@@ -546,7 +551,7 @@
             socket.onclose = () => {
                 const statusVal = document.getElementById('ui-sensor-status');
                 if(statusVal) {
-                    statusVal.innerText = 'RECONNECTING...'; 
+                    statusVal.innerText = 'ПЕРЕПІДКЛЮЧЕННЯ...'; 
                     statusVal.style.color = 'var(--warning)';
                 }
                 setTimeout(connectWebSocket, 3000);
@@ -576,22 +581,22 @@
             if(confirm("Ви впевнені, що хочете перезавантажити ESP32?")) {
                 if (socket && socket.readyState === WebSocket.OPEN) {
                     socket.send(JSON.stringify({ type: 'settings_update', reboot: true }));
-                    addLog('Reboot command sent to hardware', 'alert');
+                    addLog('Команду перезавантаження відправлено на пристрій', 'alert');
                 }
             }
         }
         
         const zoneNames = {
-            'my_bedroom': 'My Bedroom',
-            'guest_bedroom': 'Guest Bedroom',
-            'balcony_1': 'Balcony #1',
-            'main_corridor': 'Main Corridor',
-            'pantry': 'Pantry',
-            'bathroom': 'Bathroom',
-            'toilet': 'Toilet',
-            'living_room': 'Living Room',
-            'kitchen': 'Kitchen',
-            'balcony_2': 'Balcony #2'
+            'my_bedroom': 'Моя спальня',
+            'guest_bedroom': 'Гостьова спальня',
+            'balcony_1': 'Балкон №1',
+            'main_corridor': 'Головний коридор',
+            'pantry': 'Комора',
+            'bathroom': 'Ванна кімната',
+            'toilet': 'Туалет',
+            'living_room': 'Вітальня',
+            'kitchen': 'Кухня',
+            'balcony_2': 'Балкон №2'
         };
 
         function addLog(msg, type) {
@@ -722,8 +727,8 @@
             type: 'doughnut',
             data: {
                 labels: [
-                    'My Bedroom', 'Guest Bedroom', 'Balcony #1', 'Main Corridor', 
-                    'Bathroom', 'Toilet', 'Pantry', 'Living Room', 'Kitchen', 'Balcony #2'
+                    'Моя спальня', 'Гостьова спальня', 'Балкон №1', 'Головний коридор', 
+                    'Ванна кімната', 'Туалет', 'Комора', 'Вітальня', 'Кухня', 'Балкон №2'
                 ],
                 datasets: [{
                     label: 'Фіксація активності (пакетів)',
