@@ -17,7 +17,7 @@ const CHAT_ID = '1164801711';
 // Створюємо бота. polling: false, оскільки ми лише відправляємо повідомлення
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: false }); 
 
-// Локальний IP-адрес камери (оновлюється з сайту, але для хмари він потрібен лише для трансляції на клієнті)
+// Локальний IP-адрес камери (оновлюється з сайту)
 let cameraIP = '192.168.1.50'; 
 
 // Глобальний стан налаштувань системи
@@ -32,8 +32,8 @@ let lastPingTime = 0;
 let isSensorOnline = false;
 const ESP_SECRET_TOKEN = "RadarView-ESP32-C3-SecretKey-2026";
 
-// Змінні для антиспаму в Telegram
-let lastReportedZone = null;
+// Змінні для антиспаму в Telegram (Тепер об'єкт для 3-х цілей!)
+let lastReportedZones = {};
 let clearZoneTimeout = null;
 
 // Налаштування роздачі статики (веб-сайту)
@@ -51,7 +51,7 @@ setInterval(() => {
     const now = Date.now();
     if (isSensorOnline && (now - lastPingTime > 15000)) {
         isSensorOnline = false;
-        console.log('❌ Связь с ESP32 утеряна!');
+        console.log('❌ Зв\'язок з ESP32 втрачено!');
         broadcast({ type: 'status', status: 'offline' });
     }
 }, 1000);
@@ -60,56 +60,48 @@ setInterval(() => {
 app.post('/api/data', (req, res) => {
     const data = req.body;
     
-    // 1. Перевірка токена
-    if (data.token !== ESP_SECRET_TOKEN) {
-        return res.status(403).json({ error: 'Unauthorized' });
-    }
+    if (data.token !== ESP_SECRET_TOKEN) return res.status(403).json({ error: 'Unauthorized' });
     
-    // 2. Оновлення статусу онлайн
     lastPingTime = Date.now();
     if (!isSensorOnline) {
         isSensorOnline = true;
-        console.log('✅ ESP32 снова в сети!');
         broadcast({ type: 'status', status: 'online' });
     }
 
-    // 3. Логування координат
-    console.log(`📍 Координаты: X=${data.rawX || 0}, Y=${data.rawY || 0} | Зона: ${data.zone}`);
-    
-    // ==========================================
-    // ЛОГІКА ТЕКСТОВИХ ПОВІДОМЛЕНЬ TELEGRAM
-    // Фото відправляє сама камера напряму (M2M)
-    // ==========================================
-    if (deviceSettings.armed && data.movement && data.zone && data.zone !== 'none' && data.zone !== 'out_of_bounds') {
-        
-        // Антиспам: реагуємо, тільки якщо це НОВА зона
-        if (data.zone !== lastReportedZone) {
-            
-            // Відправляємо швидке текстове повідомлення (фото прилетить слідом від самої ESP32-CAM)
-            const msg = `🚨 Виявлено рух!\n📍 Зона: ${data.zone}\n⏱ Час: ${new Date().toLocaleTimeString('uk-UA')}`;
-            bot.sendMessage(CHAT_ID, msg).catch(err => console.error("Ошибка Telegram отправки текста:", err.message));
-            
-            lastReportedZone = data.zone; 
-        }
+    // --- НОВА ЛОГІКА ДЛЯ 3-Х ЦІЛЕЙ ---
+    if (deviceSettings.armed && data.movement && data.targets) {
+        data.targets.forEach(target => {
+            // Перевіряємо, чи ціль валідна (не нульова)
+            if (target.zone && target.zone !== 'none' && target.zone !== 'out_of_bounds' && target.x !== 0) {
+                
+                // Логування в консоль сервера
+                console.log(`📍 Ціль ${target.id}: X=${target.x}, Y=${target.y} | Зона: ${target.zone}`);
+                
+                // Індивідуальний антиспам для КОЖНОЇ цілі
+                if (target.zone !== lastReportedZones[target.id]) {
+                    const msg = `🚨 Виявлено рух (Ціль ${target.id})!\n📍 Зона: ${target.zone}\n⏱ Час: ${new Date().toLocaleTimeString('uk-UA')}`;
+                    bot.sendMessage(CHAT_ID, msg).catch(e => console.error("Помилка відправки в Telegram:", e.message));
+                    
+                    lastReportedZones[target.id] = target.zone; // Запам'ятовуємо зону для конкретної цілі
+                }
+            }
+        });
 
-        // Скидаємо таймер тиші при кожному русі
+        // Скидаємо глобальний таймер тиші при кожному русі
         clearTimeout(clearZoneTimeout);
-        
-        // Якщо 10 секунд повна тиша — скидаємо зону, щоб при наступному русі бот знову надіслав текст
         clearZoneTimeout = setTimeout(() => {
-            lastReportedZone = null;
-            console.log('Тишина в помещении. Зона очищена.');
+            lastReportedZones = {}; // Очищуємо пам'ять зон після 10 секунд повної тиші
+            console.log('Тиша в приміщенні. Зони очищено.');
         }, 10000);
     }
-    // ==========================================
-
-    // 4. Пересилаємо координати на сайт
-    broadcast(data);
     
-    // 5. Відповідаємо платі (200 OK) і віддаємо актуальні налаштування
+    // Пересилаємо весь масив targets на сайт
+    broadcast(data); 
+    
+    // Відповідаємо платі (200 OK) і віддаємо актуальні налаштування
     res.json(deviceSettings);
 
-    // Скидаємо прапорець перезавантаження, якщо він був
+    // Скидаємо прапорець перезавантаження після того, як відправили його на плату
     if (deviceSettings.reboot) {
         deviceSettings.reboot = false; 
     }
@@ -122,11 +114,11 @@ wss.on('connection', (ws) => {
             const msg = JSON.parse(message);
             if (msg.type === 'settings_update') {
                 if (msg.armed !== undefined) deviceSettings.armed = msg.armed;
-                if (msg.sensitivity !== undefined) deviceSettings.sensitivity = msg.sensitivity * 10; // СМ в ММ
+                if (msg.sensitivity !== undefined) deviceSettings.sensitivity = msg.sensitivity * 10; // Перевід СМ у ММ
                 if (msg.reboot !== undefined) deviceSettings.reboot = msg.reboot;
                 if (msg.cameraIP !== undefined) {
                     cameraIP = msg.cameraIP;
-                    console.log(`⚙️ Сервер обновил IP-адрес ESP32-CAM на: ${cameraIP}`);
+                    console.log(`⚙️ Сервер оновив IP-адресу ESP32-CAM на: ${cameraIP}`);
                 }
             }
         } catch (e) {}
@@ -143,5 +135,5 @@ function broadcast(payload) {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Сервер успешно запущен на порту ${PORT}`);
+    console.log(`🚀 Сервер успішно запущено на порту ${PORT}`);
 });

@@ -166,7 +166,7 @@
         .zoom-controls input[type="range"] { width: 120px; cursor: pointer; accent-color: var(--active); }
         .zoom-controls i { color: var(--text-sec); font-size: 14px; }
 
-        /* === НОВЕ: Дизайн налаштувань === */
+        /* Дизайн налаштувань */
         .settings-section {
             margin-bottom: 24px;
             padding-bottom: 24px;
@@ -250,7 +250,9 @@
                             </circle>
                         </g>
 
-                        <circle id="tracking-dot" cx="-50" cy="-50" r="8" fill="var(--active)" style="opacity: 0; filter: drop-shadow(0 0 10px var(--active)); transition: cx 0.1s linear, cy 0.1s linear;"></circle>
+                        <circle id="tracking-dot-1" cx="-50" cy="-50" r="8" fill="#3b82f6" style="opacity: 0; filter: drop-shadow(0 0 10px #3b82f6); transition: cx 0.1s linear, cy 0.1s linear;"></circle>
+                        <circle id="tracking-dot-2" cx="-50" cy="-50" r="8" fill="#ef4444" style="opacity: 0; filter: drop-shadow(0 0 10px #ef4444); transition: cx 0.1s linear, cy 0.1s linear;"></circle>
+                        <circle id="tracking-dot-3" cx="-50" cy="-50" r="8" fill="#10b981" style="opacity: 0; filter: drop-shadow(0 0 10px #10b981); transition: cx 0.1s linear, cy 0.1s linear;"></circle>
                     </svg>
                 </div>
 
@@ -403,7 +405,7 @@
             localStorage.setItem('camIP', camIP);
             handleCameraView(false); // Оновлюємо стан миттєво
             
-            // --- ВИПРАВЛЕННЯ: Відправляємо новий IP на сервер ---
+            // Відправляємо новий IP на сервер
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ type: 'settings_update', cameraIP: camIP }));
             }
@@ -423,7 +425,7 @@
         // ==========================================
         // ЛОГІКА КАМЕРИ
         // ==========================================
-        let isSleepTimerRunning = false; // Прапорець, щоб не обнуляти таймер постійно
+        let isSleepTimerRunning = false; 
 
         function handleCameraView(isMovementDetected) {
             const feed = document.getElementById('camera-feed');
@@ -442,37 +444,103 @@
 
             // Режим "Тільки при русі"
             if (isMovementDetected) {
-                // Якщо зафіксовано рух — жорстко скасовуємо таймер вимкнення
                 clearTimeout(cameraSleepTimeout);
                 isSleepTimerRunning = false; 
 
-                // Вмикаємо відеопотік, якщо він був вимкнений
                 if (feed.style.opacity === "0" || feed.style.opacity === "") {
                     feed.src = streamUrl; 
                     feed.style.opacity = "1";
                     placeholder.style.opacity = "0";
                 }
             } else {
-                // Якщо руху немає, камера працює, і таймер ЩЕ НЕ запущено
                 if (!isSleepTimerRunning && feed.style.opacity === "1") {
-                    isSleepTimerRunning = true; // Відмічаємо, що зворотний відлік пішов
+                    isSleepTimerRunning = true; 
                     
                     cameraSleepTimeout = setTimeout(() => {
                         feed.style.opacity = "0";
                         placeholder.style.opacity = "1";
-                        feed.src = ""; // Відключаємо потік, щоб не грузити мережу
-                        isSleepTimerRunning = false; // Скидаємо прапорець
-                    }, 10000); // 10 секунд тиші
+                        feed.src = ""; 
+                        isSleepTimerRunning = false; 
+                    }, 10000); 
                 }
             }
         }
+
+        // ==========================================
+        // 📊 ДИНАМІЧНА АНАЛІТИКА ТА НАКОПИЧЕННЯ ДАНИХ
+        // ==========================================
+        Chart.defaults.color = '#9fb0d0'; 
+        Chart.defaults.font.family = "'Inter', sans-serif";
+
+        const zoneActivityData = {
+            'my_bedroom': 0, 'guest_bedroom': 0, 'balcony_1': 0,
+            'main_corridor': 0, 'bathroom': 0, 'toilet': 0,
+            'pantry': 0, 'living_room': 0, 'kitchen': 0, 'balcony_2': 0
+        };
+
+        const ctx = document.getElementById('analyticsChart').getContext('2d');
+        const analyticsChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: [
+                    'Моя спальня', 'Гостьова спальня', 'Балкон №1', 'Головний коридор', 
+                    'Ванна кімната', 'Туалет', 'Комора', 'Вітальня', 'Кухня', 'Балкон №2'
+                ],
+                datasets: [{
+                    label: 'Фіксація активності',
+                    data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    backgroundColor: [
+                        '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444',
+                        '#ec4899', '#06b6d4', '#f43f5e', '#14b8a6', '#6366f1'
+                    ],
+                    borderColor: '#111a2e', 
+                    borderWidth: 3, 
+                    hoverOffset: 10
+                }]
+            },
+            options: {
+                responsive: true, 
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { 
+                        position: window.innerWidth <= 768 ? 'bottom' : 'right', 
+                        labels: { padding: 15, font: { size: 12 } } 
+                    },
+                    tooltip: { 
+                        callbacks: { 
+                            label: function(context) { 
+                                return ' ' + context.label + ': ' + context.raw + ' подій'; 
+                            } 
+                        } 
+                    }
+                }
+            }
+        });
+
+        function refreshAnalyticsChart() {
+            analyticsChart.data.datasets[0].data = [
+                zoneActivityData['my_bedroom'], zoneActivityData['guest_bedroom'],
+                zoneActivityData['balcony_1'], zoneActivityData['main_corridor'],
+                zoneActivityData['bathroom'], zoneActivityData['toilet'],
+                zoneActivityData['pantry'], zoneActivityData['living_room'],
+                zoneActivityData['kitchen'], zoneActivityData['balcony_2']
+            ];
+            analyticsChart.update();
+        }
+
+        const zoneNames = {
+            'my_bedroom': 'Моя спальня', 'guest_bedroom': 'Гостьова спальня',
+            'balcony_1': 'Балкон №1', 'main_corridor': 'Головний коридор',
+            'pantry': 'Комора', 'bathroom': 'Ванна кімната', 'toilet': 'Туалет',
+            'living_room': 'Вітальня', 'kitchen': 'Кухня', 'balcony_2': 'Балкон №2'
+        };
 
         // ==========================================
         // ЛОГІКА СОКЕТІВ ТА РАДАРА
         // ==========================================
         function connectWebSocket() {
             socket = new WebSocket(protocol + window.location.host);
-            let lastLoggedZone = null; 
+            let lastLoggedZones = {}; // Зберігаємо останню зону для кожної цілі окремо
 
             socket.onmessage = (event) => {
                 const data = JSON.parse(event.data);
@@ -494,40 +562,39 @@
                     }
                     return;
                 }
-
-                if (data.movement) {
-                    handleCameraView(true);
-
-                    // --- Інкремент даних аналітики для поточної зони ---
-                    if (data.zone && zoneActivityData[data.zone] !== undefined) {
-                        zoneActivityData[data.zone] += 1; 
-                        refreshAnalyticsChart();          
-                    }
-                    // ---------------------------------------------------------
-
-                    if (isDraggingSensor) {
-                        const dot = document.getElementById('tracking-dot');
+                
+                // Якщо користувач тягає радар мишкою - ховаємо всі точки
+                if (isDraggingSensor) {
+                    for (let i = 1; i <= 3; i++) {
+                        let dot = document.getElementById(`tracking-dot-${i}`);
                         if (dot) dot.style.opacity = '0';
-                        return;
                     }
+                    return;
+                }
 
-                    const zoneDisplay = document.getElementById('ui-active-zone');
-                    if (zoneDisplay) zoneDisplay.innerText = zoneNames[data.zone] || data.zone;
+                if (data.movement && data.targets) {
+                    handleCameraView(true);
                     
                     document.querySelectorAll('.zone').forEach(z => z.classList.remove('active-red'));
-                    const activeRect = document.getElementById('zone_' + data.zone);
-                    if (activeRect) activeRect.classList.add('active-red');
+                    let activeZonesTexts = []; // Масив для відображення текстових назв активних зон
 
-                    const dot = document.getElementById('tracking-dot');
-                    if (dot && data.rawX !== undefined && data.rawY !== undefined) {
+                    data.targets.forEach(target => {
+                        const dot = document.getElementById(`tracking-dot-${target.id}`);
+                        if (!dot) return;
+
+                        if (target.x === 0 && target.y === 0) {
+                            dot.style.opacity = '0';
+                            return;
+                        }
+
                         const SENSOR_X = currX; 
                         const SENSOR_Y = currY;
                         const SCALE = 25.0; 
 
-                        const dx_forward = data.rawY * -0.707;
-                        const dy_forward = data.rawY * -0.707;
-                        const dx_lateral = data.rawX * 0.707;
-                        const dy_lateral = data.rawX * -0.707;
+                        const dx_forward = target.y * -0.707;
+                        const dy_forward = target.y * -0.707;
+                        const dx_lateral = target.x * 0.707;
+                        const dy_lateral = target.x * -0.707;
 
                         const finalX = SENSOR_X + ((dx_forward + dx_lateral) / SCALE);
                         const finalY = SENSOR_Y + ((dy_forward + dy_lateral) / SCALE);
@@ -535,16 +602,46 @@
                         dot.style.opacity = '1';
                         dot.setAttribute('cx', finalX);
                         dot.setAttribute('cy', finalY);
-                    }
 
-                    if (data.zone !== lastLoggedZone) {
-                        const niceZoneName = zoneNames[data.zone] || data.zone;
-                        addLog(`Вхід у зону: ${niceZoneName}`, 'warning');
-                        lastLoggedZone = data.zone;
+                        // Логіка підсвічування зон, аналітики та логів для КОЖНОЇ цілі
+                        if (target.zone && target.zone !== 'none' && target.zone !== 'out_of_bounds') {
+                            const activeRect = document.getElementById('zone_' + target.zone);
+                            if (activeRect) activeRect.classList.add('active-red');
+                            
+                            const niceZoneName = zoneNames[target.zone] || target.zone;
+                            if (!activeZonesTexts.includes(niceZoneName)) {
+                                activeZonesTexts.push(niceZoneName);
+                            }
+                            
+                            // Запис до аналітики (Графік Chart.js)
+                            if (zoneActivityData[target.zone] !== undefined) {
+                                zoneActivityData[target.zone]++;
+                                refreshAnalyticsChart();
+                            }
+
+                            // Логування в журнал подій при зміні зони конкретної цілі
+                            if (target.zone !== lastLoggedZones[target.id]) {
+                                addLog(`Ціль ${target.id} у зоні: ${niceZoneName}`, 'warning');
+                                lastLoggedZones[target.id] = target.zone;
+                            }
+                        }
+                    });
+
+                    // Оновлення тексту в картці "Активна зона"
+                    const zoneDisplay = document.getElementById('ui-active-zone');
+                    if (zoneDisplay) {
+                        zoneDisplay.innerText = activeZonesTexts.length > 0 ? activeZonesTexts.join(', ') : 'Немає активності';
                     }
                 } else {
-                    // Якщо руху немає, повідомляємо камеру
                     handleCameraView(false);
+                    const zoneDisplay = document.getElementById('ui-active-zone');
+                    if (zoneDisplay) zoneDisplay.innerText = 'Очікування даних';
+                    
+                    // Ховаємо всі точки, якщо немає руху
+                    for (let i = 1; i <= 3; i++) {
+                        let dot = document.getElementById(`tracking-dot-${i}`);
+                        if (dot) dot.style.opacity = '0';
+                    }
                 }
             };
 
@@ -560,10 +657,9 @@
 
         connectWebSocket();
 
-        // Відправка налаштувань радара (озброєння + чутливість)
         function sendSettings() {
             const isArmed = document.getElementById('ui-armed').checked;
-            const sensValue = parseInt(document.getElementById('ui-sens').value) || 30; // Беремо значення чутливості
+            const sensValue = parseInt(document.getElementById('ui-sens').value) || 30; 
             
             const payload = { 
                 type: 'settings_update', 
@@ -585,19 +681,6 @@
                 }
             }
         }
-        
-        const zoneNames = {
-            'my_bedroom': 'Моя спальня',
-            'guest_bedroom': 'Гостьова спальня',
-            'balcony_1': 'Балкон №1',
-            'main_corridor': 'Головний коридор',
-            'pantry': 'Комора',
-            'bathroom': 'Ванна кімната',
-            'toilet': 'Туалет',
-            'living_room': 'Вітальня',
-            'kitchen': 'Кухня',
-            'balcony_2': 'Балкон №2'
-        };
 
         function addLog(msg, type) {
             const list = document.getElementById('log-list');
@@ -684,7 +767,7 @@
             updateMapTransform();
         });
 
-        // ПЕРЕКЛЮЧЕННЯ ЕКРАНІВ ТА АНАЛІТИКА
+        // ПЕРЕКЛЮЧЕННЯ ЕКРАНІВ
         const navItems = document.querySelectorAll('.nav-item');
         const views = ['view-dashboard', 'view-analytics', 'view-settings'];
 
@@ -701,81 +784,6 @@
                 targetView.style.display = '';
             });
         });
-
-        Chart.defaults.color = '#9fb0d0'; 
-        Chart.defaults.font.family = "'Inter', sans-serif";
-
-        // ==========================================
-        // 📊 ДИНАМІЧНА АНАЛІТИКА ТА НАКОПИЧЕННЯ ДАНИХ
-        // ==========================================
-
-        const zoneActivityData = {
-            'my_bedroom': 0,
-            'guest_bedroom': 0,
-            'balcony_1': 0,
-            'main_corridor': 0,
-            'bathroom': 0,
-            'toilet': 0,
-            'pantry': 0,
-            'living_room': 0,
-            'kitchen': 0,
-            'balcony_2': 0
-        };
-
-        const ctx = document.getElementById('analyticsChart').getContext('2d');
-        const analyticsChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: [
-                    'Моя спальня', 'Гостьова спальня', 'Балкон №1', 'Головний коридор', 
-                    'Ванна кімната', 'Туалет', 'Комора', 'Вітальня', 'Кухня', 'Балкон №2'
-                ],
-                datasets: [{
-                    label: 'Фіксація активності (пакетів)',
-                    data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    backgroundColor: [
-                        '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444',
-                        '#ec4899', '#06b6d4', '#f43f5e', '#14b8a6', '#6366f1'
-                    ],
-                    borderColor: '#111a2e', 
-                    borderWidth: 3, 
-                    hoverOffset: 10
-                }]
-            },
-            options: {
-                responsive: true, 
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { 
-                        position: window.innerWidth <= 768 ? 'bottom' : 'right', 
-                        labels: { padding: 15, font: { size: 12 } } 
-                    },
-                    tooltip: { 
-                        callbacks: { 
-                            label: function(context) { 
-                                return ' ' + context.label + ': ' + context.raw + ' подій'; 
-                            } 
-                        } 
-                    }
-                }
-            }
-        });
-
-        function refreshAnalyticsChart() {
-            analyticsChart.data.datasets[0].data = [
-                zoneActivityData['my_bedroom'],
-                zoneActivityData['guest_bedroom'],
-                zoneActivityData['balcony_1'],
-                zoneActivityData['main_corridor'],
-                zoneActivityData['bathroom'],
-                zoneActivityData['toilet'],
-                zoneActivityData['pantry'],
-                zoneActivityData['living_room'],
-                zoneActivityData['kitchen'],
-                zoneActivityData['balcony_2']
-            ];
-            analyticsChart.update();
-        }
     </script>
 </body>
 </html>
