@@ -24,7 +24,8 @@ let cameraIP = '192.168.1.50';
 let deviceSettings = {
     armed: true,         // Чи увімкнена охорона
     sensitivity: 300,    // Фільтр дистанції в міліметрах (30 см)
-    reboot: false        // Прапорець перезавантаження
+    reboot: false,       // Прапорець перезавантаження
+    deepSleep: false     // Прапорець режиму сну (за замовчуванням вимкнено для плавного трекінгу)
 }; 
 
 // Константи для контролю статусу зв'язку
@@ -116,6 +117,7 @@ wss.on('connection', (ws) => {
                 if (msg.armed !== undefined) deviceSettings.armed = msg.armed;
                 if (msg.sensitivity !== undefined) deviceSettings.sensitivity = msg.sensitivity * 10; // Перевід СМ у ММ
                 if (msg.reboot !== undefined) deviceSettings.reboot = msg.reboot;
+                if (msg.deepSleep !== undefined) deviceSettings.deepSleep = msg.deepSleep; // Оновлюємо стан режиму сну
                 if (msg.cameraIP !== undefined) {
                     cameraIP = msg.cameraIP;
                     console.log(`⚙️ Сервер оновив IP-адресу ESP32-CAM на: ${cameraIP}`);

@@ -353,7 +353,15 @@
                 <div class="settings-section">
                     <h3 class="section-heading"><i class="fas fa-microchip"></i> Системні налаштування</h3>
                     
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="settings-row">
+                        <div>
+                            <div style="font-weight: 600; font-size: 15px;">Режим сну (Deep Sleep)</div>
+                            <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Вимкніть для безперервного та плавного трекінгу</div>
+                        </div>
+                        <input id="ui-deep-sleep" type="checkbox" onchange="sendSettings()" style="width: 20px; height: 20px; cursor: pointer;">
+                    </div>
+
+                    <div class="settings-row">
                         <div>
                             <div style="font-weight: 600; font-size: 15px;">Перезавантаження обладнання</div>
                             <div style="font-size: 12px; color: var(--text-sec); margin-top: 4px;">Віддалене перезавантаження ESP32-C3</div>
@@ -403,9 +411,8 @@
             camIP = document.getElementById('sett-cam-ip').value;
             localStorage.setItem('camMode', camMode);
             localStorage.setItem('camIP', camIP);
-            handleCameraView(false); // Оновлюємо стан миттєво
+            handleCameraView(false); 
             
-            // Відправляємо новий IP на сервер
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ type: 'settings_update', cameraIP: camIP }));
             }
@@ -442,7 +449,6 @@
                 return;
             }
 
-            // Режим "Тільки при русі"
             if (isMovementDetected) {
                 clearTimeout(cameraSleepTimeout);
                 isSleepTimerRunning = false; 
@@ -540,7 +546,7 @@
         // ==========================================
         function connectWebSocket() {
             socket = new WebSocket(protocol + window.location.host);
-            let lastLoggedZones = {}; // Зберігаємо останню зону для кожної цілі окремо
+            let lastLoggedZones = {}; 
 
             socket.onmessage = (event) => {
                 const data = JSON.parse(event.data);
@@ -563,7 +569,6 @@
                     return;
                 }
                 
-                // Якщо користувач тягає радар мишкою - ховаємо всі точки
                 if (isDraggingSensor) {
                     for (let i = 1; i <= 3; i++) {
                         let dot = document.getElementById(`tracking-dot-${i}`);
@@ -576,7 +581,7 @@
                     handleCameraView(true);
                     
                     document.querySelectorAll('.zone').forEach(z => z.classList.remove('active-red'));
-                    let activeZonesTexts = []; // Масив для відображення текстових назв активних зон
+                    let activeZonesTexts = []; 
 
                     data.targets.forEach(target => {
                         const dot = document.getElementById(`tracking-dot-${target.id}`);
@@ -603,7 +608,6 @@
                         dot.setAttribute('cx', finalX);
                         dot.setAttribute('cy', finalY);
 
-                        // Логіка підсвічування зон, аналітики та логів для КОЖНОЇ цілі
                         if (target.zone && target.zone !== 'none' && target.zone !== 'out_of_bounds') {
                             const activeRect = document.getElementById('zone_' + target.zone);
                             if (activeRect) activeRect.classList.add('active-red');
@@ -613,13 +617,11 @@
                                 activeZonesTexts.push(niceZoneName);
                             }
                             
-                            // Запис до аналітики (Графік Chart.js)
                             if (zoneActivityData[target.zone] !== undefined) {
                                 zoneActivityData[target.zone]++;
                                 refreshAnalyticsChart();
                             }
 
-                            // Логування в журнал подій при зміні зони конкретної цілі
                             if (target.zone !== lastLoggedZones[target.id]) {
                                 addLog(`Ціль ${target.id} у зоні: ${niceZoneName}`, 'warning');
                                 lastLoggedZones[target.id] = target.zone;
@@ -627,7 +629,6 @@
                         }
                     });
 
-                    // Оновлення тексту в картці "Активна зона"
                     const zoneDisplay = document.getElementById('ui-active-zone');
                     if (zoneDisplay) {
                         zoneDisplay.innerText = activeZonesTexts.length > 0 ? activeZonesTexts.join(', ') : 'Немає активності';
@@ -637,7 +638,6 @@
                     const zoneDisplay = document.getElementById('ui-active-zone');
                     if (zoneDisplay) zoneDisplay.innerText = 'Очікування даних';
                     
-                    // Ховаємо всі точки, якщо немає руху
                     for (let i = 1; i <= 3; i++) {
                         let dot = document.getElementById(`tracking-dot-${i}`);
                         if (dot) dot.style.opacity = '0';
@@ -657,19 +657,22 @@
 
         connectWebSocket();
 
+        // ОНОВЛЕНА ФУНКЦІЯ: ТЕПЕР ЗЧИТУЄ І ВІДПРАВЛЯЄ СТАН СНУ
         function sendSettings() {
             const isArmed = document.getElementById('ui-armed').checked;
             const sensValue = parseInt(document.getElementById('ui-sens').value) || 30; 
+            const isDeepSleep = document.getElementById('ui-deep-sleep').checked; // Зчитуємо новий чекбокс
             
             const payload = { 
                 type: 'settings_update', 
                 armed: isArmed,
-                sensitivity: sensValue 
+                sensitivity: sensValue,
+                deepSleep: isDeepSleep // Додаємо в пакет для сервера
             };
             
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify(payload));
-                addLog(`Налаштування оновлено (Фільтр: ${sensValue} см)`, 'info');
+                addLog(`Налаштування оновлено (Фільтр: ${sensValue} см, Сон: ${isDeepSleep ? 'Увімк' : 'Вимк'})`, 'info');
             }
         }
 
